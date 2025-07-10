@@ -35,7 +35,10 @@ impl Tree {
         Ok(buffer)
     }
 
-    pub fn get_tree_entries(bytes_output: Vec<u8>, head: &Header) -> std::io::Result<Vec<TreeEntry>> {
+    pub fn get_tree_entries(
+        bytes_output: Vec<u8>,
+        head: &Header,
+    ) -> std::io::Result<Vec<TreeEntry>> {
         // head.head_length() = length of the head, in order to skip it
         // head.size = size of the content to parse starting after head.head_length()
         //
@@ -51,7 +54,6 @@ impl Tree {
                 i += 1
             }
             let mode = String::from_utf8(bytes_output[start..i].to_vec()).unwrap();
-            dbg!(&mode);
             let objecttype: ObjectType;
             match mode.as_str() {
                 "100644" => objecttype = ObjectType::Blob,

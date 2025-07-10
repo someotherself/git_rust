@@ -102,7 +102,7 @@ impl GitObject for Blob {
 
     // hash-object command
     fn encode_object(args: &ArgMatches) -> std::io::Result<Blob> {
-        let sub_arg = args.get_flag("pretty");
+        let sub_arg = args.get_flag("write");
         let object = args
             .get_one::<String>("file")
             .expect("File is required.")

@@ -26,7 +26,7 @@ fn main() -> std::io::Result<()> {
             Command::new("hash-object")
                 .about("Compute object ID and optionally create an object from a file")
                 .arg(
-                    Arg::new("pretty")
+                    Arg::new("write")
                         .short('w')
                         .help("Actually write the object into the object database.")
                         .action(ArgAction::SetTrue),

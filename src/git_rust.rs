@@ -2,11 +2,13 @@ use clap::ArgMatches;
 use std::{
     fs,
     io::Error,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, OnceLock},
 };
 
-use crate::objects::{GitObject, blob::Blob, tree::Tree};
+use crate::{
+    objects::{GitObject, blob::Blob, tree::Tree},
+};
 
 pub const BASE_DIR: &str = ".git_rust";
 
@@ -17,8 +19,14 @@ pub struct RepoRust {
 }
 
 impl RepoRust {
-    pub fn new_repo(_path: &str) -> std::io::Result<()> {
-        todo!()
+    pub fn new_repo(path: &str) -> std::io::Result<()> {
+        let repo = RepoRust {
+            base_path: path.into(),
+        };
+        REPO.set(Arc::new(repo))
+            // Error
+            .map_err(|_| Error::other("Failed to read filesystem"))?;
+        Ok(())
     }
 
     pub fn change_path(_path: &str) -> std::io::Result<()> {
@@ -32,23 +40,33 @@ impl RepoRust {
         todo!()
     }
 
-    pub fn get_root() -> std::io::Result<Arc<RepoRust>> {
-        let dir = RepoRust::find_root()?;
-        let repo = REPO
-            .get_or_init(|| Arc::new(RepoRust { base_path: dir }))
-            .clone();
-        Ok(repo)
+pub fn get_root() -> std::io::Result<Arc<RepoRust>> {
+        // handle root not initialized
+        // Check if RustRepo already initialized -> return that repo
+        // If not, search for the path
+    if let Some(repo) = REPO.get() {
+        return Ok(repo.clone());
     }
 
+    let dir = RepoRust::find_root().unwrap_or_else(|_| {
+        std::env::current_dir()
+            .expect("Failed to read filesystem")
+    });
+
+    Ok(REPO
+        .get_or_init(|| Arc::new(RepoRust { base_path: dir }))
+        .clone())
+}
+
     fn find_root() -> std::io::Result<PathBuf> {
-        let mut dir = std::env::current_dir()
-            .map_err(|_| Error::other("Failed to read filesystem"))?;
+        let mut dir =
+            std::env::current_dir().map_err(|_| Error::other("Failed to read filesystem"))?;
         loop {
             if dir.join(BASE_DIR).is_dir() {
                 return Ok(dir);
             }
             if !dir.pop() {
-                return Err(std::io::Error::other("Failed to read filesystem"));
+                return Err(std::io::Error::other("Could not find any repo folder"));
             }
         }
     }
@@ -58,15 +76,15 @@ impl RepoRust {
     }
 
     pub fn init() -> std::io::Result<()> {
-        let head = Path::new(".git/HEAD");
+        let root = RepoRust::get_root()?;
+        let head = root.base_path.join(BASE_DIR).join("HEAD");
         if head.try_exists()? {
             println!("Git already initialized!");
         } else {
-            let base_dir = PathBuf::from(BASE_DIR);
-            fs::create_dir(&base_dir)?;
-            fs::create_dir(base_dir.join("objects"))?;
-            fs::create_dir(base_dir.join("refs"))?;
-            fs::write(head, "ref: refs/heads/master\n").unwrap();
+            fs::create_dir(root.base_path.join(BASE_DIR))?;
+            fs::create_dir(root.base_path.join(BASE_DIR).join("objects"))?;
+            fs::create_dir(root.base_path.join(BASE_DIR).join("refs"))?;
+            fs::write(head, "ref: refs/heads/master\n")?;
             println!("Initialized git directory!");
         }
         Ok(())
