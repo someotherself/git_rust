@@ -1,13 +1,18 @@
-use std::{fmt::Display, io::Write, path::PathBuf};
+use std::{
+    fmt::Display,
+    io::{Read, Write},
+    path::PathBuf,
+};
 
 use clap::ArgMatches;
-use flate2::{Compress, Compression, write::ZlibEncoder};
+use flate2::{Compress, Compression, bufread::ZlibDecoder, write::ZlibEncoder};
 use hex::ToHex;
 use sha1::{Digest, Sha1};
 
-use crate::git_rust::BASE_DIR;
-use crate::objects::{GitObject, Header, ObjectType, blob};
-use crate::utils::{de_compress, find_file_in_repo, write_object};
+use crate::{
+    git_rust::Repo_Rust,
+    objects::{GitObject, Header, ObjectType, blob},
+};
 
 pub(crate) struct Blob {
     pub(crate) header: Header,
@@ -17,11 +22,19 @@ pub(crate) struct Blob {
 }
 
 impl Blob {
+    pub fn get_folder(&self) -> &str {
+        &self.folder
+    }
+
+    pub fn get_file(&self) -> &str {
+        &self.file
+    }
+
     fn new_from_bytes(bytes: Vec<u8>) -> std::io::Result<Self> {
         let mut pos: usize = 0;
         for (idx, &byte) in bytes.iter().enumerate() {
             if byte == b' ' {
-                pos = idx
+                pos = idx + 1
             }
         }
         let hash = std::str::from_utf8(&&bytes[pos..]).unwrap().to_owned();
@@ -56,8 +69,14 @@ impl Blob {
         };
         Ok(blob)
     }
-}
 
+    pub fn de_compress(content: Vec<u8>) -> std::io::Result<Vec<u8>> {
+        let mut buffer = vec![0; 1024];
+        let mut decompressed = ZlibDecoder::new(&content[..]);
+        decompressed.read(&mut buffer)?;
+        Ok(buffer)
+    }
+}
 
 impl GitObject for Blob {
     const TYPE: ObjectType = ObjectType::Blob;
@@ -68,8 +87,9 @@ impl GitObject for Blob {
     }
 
     fn write_object_to_file(&self, file: Vec<u8>) -> std::io::Result<()> {
-        let folder_path = PathBuf::from(format!(".git/objects/{}", self.folder));
-        let file_path = PathBuf::from(format!(".git/objects/{}/{}", self.folder, self.file));
+        let root_path = Repo_Rust::get_object_folder(Repo_Rust::get_root()?.base_path.clone())?;
+        let folder_path = root_path.join(&self.folder);
+        let file_path = folder_path.join(&self.file);
         if !folder_path.exists() {
             std::fs::create_dir(folder_path)?;
         }
@@ -81,7 +101,6 @@ impl GitObject for Blob {
     }
 
     // hash-object command
-    // FIX
     fn encode_object(args: &ArgMatches) -> std::io::Result<Blob> {
         let sub_arg = args.get_flag("pretty");
         let object = args
@@ -91,26 +110,25 @@ impl GitObject for Blob {
         let file = std::fs::read(PathBuf::from(object))?;
         let blob = blob::Blob::blob_with_sha1(file.clone())?;
         if sub_arg {
-            write_object(&blob, file)?;
+            blob.write_object_to_file(file)?;
         }
         Ok(blob)
     }
 
     // cat-file command
     fn decode_object(args: &ArgMatches) -> std::io::Result<Blob> {
+        let root_path = Repo_Rust::get_object_folder(Repo_Rust::get_root()?.base_path.clone())?;
         let _sub_arg = args.get_flag("pretty");
         let hash = args
             .get_one::<String>("hash")
             .expect("Hash is required.")
             .to_owned();
-        find_file_in_repo();
+
         let (folder_name, file_name) = hash.split_at(2);
-        let file_path = PathBuf::from(format!(
-            "{}/objects/{}/{}",
-            BASE_DIR, folder_name, file_name
-        ));
+        let file_path = root_path.join(folder_name).join(file_name);
         let file = std::fs::read(file_path)?;
-        let bytes_output = de_compress(file)?;
+
+        let bytes_output = Blob::de_compress(file)?;
         let blob = Blob::new_from_bytes(bytes_output)?;
         Ok(blob)
     }

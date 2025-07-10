@@ -22,6 +22,12 @@ pub struct Header {
 }
 
 impl Header {
+    pub fn head_length(&self) -> usize {
+        let object = format!("{}", self.object);
+        let content_size = format!("{}", self.size);
+        object.len() + content_size.len() + 1
+    }
+
     pub fn from_binary(file: Vec<u8>) -> std::io::Result<Header> {
         let header = file
             .iter()
