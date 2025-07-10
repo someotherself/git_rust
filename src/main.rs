@@ -1,8 +1,5 @@
-// #![allow(unused_imports, unused_variables)]
-
 mod git_rust;
 mod objects;
-mod utils;
 
 #[cfg(test)]
 mod test_common;

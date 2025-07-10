@@ -1,10 +1,9 @@
 use clap::{Arg, ArgAction, ArgMatches, Command, command};
 use std::{
     ops::Deref,
-    path::{Path, PathBuf},
-    sync::{LazyLock, Mutex},
+    path::Path,
 };
-use tempfile::{Builder, NamedTempFile, TempDir};
+use tempfile::{Builder, TempDir};
 
 pub struct TestDir {
     root: TempDir,
