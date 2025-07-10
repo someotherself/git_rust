@@ -50,9 +50,3 @@ fn main() -> std::io::Result<()> {
     }
     Ok(())
 }
-
-// cargo run cat-file 082783ac052bea481c61f72ebef5c69059c09c8b
-// cargo run cat-file f7746c83e36e4a498bb9016948ff388d7eb6b0c4
-// cargo run cat-file 966435e7c669e2126c290c36598ee7566dcc7c13
-
-// cargo run cat-file -p 414676d49a5185c24421b389ece49af29b6ff1d0

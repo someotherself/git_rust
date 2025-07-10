@@ -1,6 +1,5 @@
 use clap::{Arg, ArgAction, ArgMatches, Command, command};
 use std::{
-    ops::Deref,
     path::Path,
 };
 use tempfile::{Builder, TempDir};
@@ -12,8 +11,6 @@ pub struct TestDir {
 #[allow(dead_code)]
 pub struct TestSetup {
     pub dir: TestDir,
-    // Remove this
-    key: &'static str,
 }
 
 impl TestDir {
@@ -32,26 +29,26 @@ impl TestDir {
 }
 
 #[allow(dead_code)]
-pub fn run_test<T>(key: &'static str, f: T)
+pub fn run_test<T>( f: T)
 where
     T: FnOnce(&TestSetup),
 {
     let dir = TestDir::new_dir();
-    let r = TestSetup { dir, key };
+    let r = TestSetup { dir };
     f(&r);
 }
 
-impl Deref for TestDir {
-    type Target = Path;
-    fn deref(&self) -> &Self::Target {
-        self.path()
-    }
-}
-impl AsRef<Path> for TestDir {
-    fn as_ref(&self) -> &Path {
-        self.path()
-    }
-}
+// impl Deref for TestDir {
+//     type Target = Path;
+//     fn deref(&self) -> &Self::Target {
+//         self.path()
+//     }
+// }
+// impl AsRef<Path> for TestDir {
+//     fn as_ref(&self) -> &Path {
+//         self.path()
+//     }
+// }
 
 pub fn cat_file_pretty(hash: &str) -> ArgMatches {
     let matches = command!().subcommand(
@@ -69,10 +66,3 @@ pub fn cat_file_pretty(hash: &str) -> ArgMatches {
     let (_, arg) = matches.remove_subcommand().unwrap();
     arg
 }
-
-// Rename the git folder for the crate
-// Test each one individually and compare results
-// Copy a file from one to the other and compare results
-
-// Create tempdir called .git_rust in the parent dir
-// Init git_rust in there and rename the one in the root dir
