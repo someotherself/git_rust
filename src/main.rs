@@ -5,7 +5,7 @@ mod objects;
 mod test_common;
 
 use clap::{Arg, ArgAction, Command, command};
-use git_rust::Repo_Rust;
+use git_rust::RepoRust;
 
 use std::env;
 
@@ -41,10 +41,10 @@ fn main() -> std::io::Result<()> {
         .get_matches();
 
     match matches.subcommand() {
-        Some(("init", _)) => Repo_Rust::init()?,
-        Some(("cat-file", args)) => Repo_Rust::cat_file(args)?,
-        Some(("hash-object", args)) => Repo_Rust::hash_object(args)?,
-        Some(("ls-tree", args)) => Repo_Rust::ls_tree(args)?,
+        Some(("init", _)) => RepoRust::init()?,
+        Some(("cat-file", args)) => RepoRust::cat_file(args)?,
+        Some(("hash-object", args)) => RepoRust::hash_object(args)?,
+        Some(("ls-tree", args)) => RepoRust::ls_tree(args)?,
         Some((_, _)) => {}
         None => {}
     }

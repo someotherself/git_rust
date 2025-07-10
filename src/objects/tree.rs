@@ -6,7 +6,7 @@ use flate2::bufread::ZlibDecoder;
 use hex::ToHex;
 
 use crate::{
-    git_rust::Repo_Rust,
+    git_rust::RepoRust,
     objects::{GitObject, Header, ObjectType},
 };
 
@@ -31,7 +31,7 @@ impl Tree {
     pub fn de_compress(content: Vec<u8>) -> std::io::Result<Vec<u8>> {
         let mut buffer = vec![0; 1024];
         let mut decompressed = ZlibDecoder::new(&content[..]);
-        decompressed.read(&mut buffer)?;
+        decompressed.read_exact(&mut buffer)?;
         Ok(buffer)
     }
 
@@ -96,7 +96,7 @@ impl GitObject for Tree {
 
     // ls-tree
     fn decode_object(args: &ArgMatches) -> std::io::Result<Tree> {
-        let root_path = Repo_Rust::get_object_folder(Repo_Rust::get_root()?.base_path.clone())?;
+        let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
 
         let hash = args
             .get_one::<String>("hash")

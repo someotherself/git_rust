@@ -10,7 +10,7 @@ use hex::ToHex;
 use sha1::{Digest, Sha1};
 
 use crate::{
-    git_rust::Repo_Rust,
+    git_rust::RepoRust,
     objects::{GitObject, Header, ObjectType, blob},
 };
 
@@ -37,7 +37,7 @@ impl Blob {
                 pos = idx + 1
             }
         }
-        let hash = std::str::from_utf8(&&bytes[pos..]).unwrap().to_owned();
+        let hash = std::str::from_utf8(&bytes[pos..]).unwrap().to_owned();
 
         let header = Header::from_binary(bytes)?;
         let (folder, file) = hash.split_at(2).to_owned();
@@ -73,7 +73,7 @@ impl Blob {
     pub fn de_compress(content: Vec<u8>) -> std::io::Result<Vec<u8>> {
         let mut buffer = vec![0; 1024];
         let mut decompressed = ZlibDecoder::new(&content[..]);
-        decompressed.read(&mut buffer)?;
+        decompressed.read_exact(&mut buffer)?;
         Ok(buffer)
     }
 }
@@ -87,7 +87,7 @@ impl GitObject for Blob {
     }
 
     fn write_object_to_file(&self, file: Vec<u8>) -> std::io::Result<()> {
-        let root_path = Repo_Rust::get_object_folder(Repo_Rust::get_root()?.base_path.clone())?;
+        let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
         let folder_path = root_path.join(&self.folder);
         let file_path = folder_path.join(&self.file);
         if !folder_path.exists() {
@@ -117,7 +117,7 @@ impl GitObject for Blob {
 
     // cat-file command
     fn decode_object(args: &ArgMatches) -> std::io::Result<Blob> {
-        let root_path = Repo_Rust::get_object_folder(Repo_Rust::get_root()?.base_path.clone())?;
+        let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
         let _sub_arg = args.get_flag("pretty");
         let hash = args
             .get_one::<String>("hash")
@@ -137,6 +137,6 @@ impl GitObject for Blob {
 impl Display for Blob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let hash = self.hash.clone();
-        write!(f, "{}", hash)
+        write!(f, "{hash}")
     }
 }
