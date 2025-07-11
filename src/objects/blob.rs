@@ -31,15 +31,13 @@ impl Blob {
     }
 
     fn new_from_bytes(bytes: Vec<u8>) -> std::io::Result<Self> {
-        let mut pos: usize = 0;
-        for (idx, &byte) in bytes.iter().enumerate() {
-            if byte == b' ' {
-                pos = idx + 1
-            }
-        }
-        let hash = std::str::from_utf8(&bytes[pos..]).unwrap().to_owned();
+        let null_pos = bytes.iter().position(|&b| b == b'\0').unwrap();
 
-        let header = Header::from_binary(bytes)?;
+        let header_bytes = &bytes[..null_pos];
+        let content_bytes = &bytes[null_pos + 1..];
+
+        let hash = std::str::from_utf8(content_bytes).unwrap().to_owned();
+        let header = Header::from_binary(header_bytes.to_vec())?;
         let (folder, file) = hash.split_at(2).to_owned();
 
         Ok(Self {
@@ -71,9 +69,9 @@ impl Blob {
     }
 
     pub fn de_compress(content: Vec<u8>) -> std::io::Result<Vec<u8>> {
-        let mut buffer = vec![0; 1024];
         let mut decompressed = ZlibDecoder::new(&content[..]);
-        decompressed.read_exact(&mut buffer)?;
+        let mut buffer = Vec::new();
+        decompressed.read_to_end(&mut buffer)?;
         Ok(buffer)
     }
 }
@@ -96,13 +94,15 @@ impl GitObject for Blob {
         let new_blob = std::fs::File::create(file_path)?;
         let mut enc =
             ZlibEncoder::new_with_compress(new_blob, Compress::new(Compression::best(), true));
-        enc.write_all(&file)?;
+        let header = format!("blob {}\0", file.len());
+        let full_blob = [header.as_bytes(), &file[..]].concat();
+
+        enc.write_all(&full_blob)?;
         Ok(())
     }
 
     // hash-object command
     fn encode_object(args: &ArgMatches) -> std::io::Result<Blob> {
-        dbg!(&args);
         let sub_arg = args.get_flag("write");
         let object = args
             .get_one::<String>("file")
@@ -128,7 +128,6 @@ impl GitObject for Blob {
         let (folder_name, file_name) = hash.split_at(2);
         let file_path = root_path.join(folder_name).join(file_name);
         let file = std::fs::read(file_path)?;
-
         let bytes_output = Blob::de_compress(file)?;
         let blob = Blob::new_from_bytes(bytes_output)?;
         Ok(blob)

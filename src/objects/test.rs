@@ -64,6 +64,18 @@ fn test_hash_file_in_temp_folder() {
         let git2_hash = repo.find_blob(blob_oid).unwrap();
 
         assert_eq!(git2_hash.id().to_string(), format!("{}", git_rust_hash));
+
+        // cat-file the object
+        let cat_args = run_test_matches(vec!["", "cat-file", "-p", &format!("{}", git_rust_hash)]);
+        let git_rust_content = blob::Blob::decode_object(&cat_args).unwrap();
+
+        let oid = repo.find_blob(blob_oid).unwrap();
+        let git2_content = oid.content();
+
+        assert_eq!(
+            format!("{}", str::from_utf8(git2_content).unwrap()),
+            format!("{}", git_rust_content)
+        );
     });
 }
 
