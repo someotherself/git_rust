@@ -5,14 +5,19 @@ use thread_local::ThreadLocal;
 use crate::objects::{GitObject, blob::Blob, tree::Tree};
 
 pub const BASE_DIR: &str = ".git_rust";
+
+// ThreadLocal for testing purposes
 pub static REPO: ThreadLocal<Arc<RepoRust>> = ThreadLocal::new();
 
+// Built internally, to hold information about the repo
+// base_path - used finding the repo location when not in root
 pub struct RepoRust {
     pub base_path: PathBuf,
 }
 
 #[allow(dead_code)]
 impl RepoRust {
+    // Used internaly. No connection to git init
     pub fn new_repo(path: &str) -> std::io::Result<()> {
         let repo = RepoRust {
             base_path: path.into(),
@@ -25,17 +30,20 @@ impl RepoRust {
         Ok(())
     }
 
+    // TODO
     pub fn change_path(_path: &str) -> std::io::Result<()> {
         // Check if path is same as old
         todo!()
     }
 
+    // TODO
     pub fn move_repo(_path: &str) -> std::io::Result<()> {
         // Check if path is same as old
         // Check if a repo already exists in that dir
         todo!()
     }
 
+    // Used by git init when repo already initialized (when testing)
     pub fn get_root() -> std::io::Result<Arc<RepoRust>> {
         if let Some(repo) = REPO.get() {
             return Ok(repo.clone());
@@ -49,6 +57,8 @@ impl RepoRust {
             .clone())
     }
 
+    // Used by git init to find repo
+    // Will search starting in project root and upwards
     fn find_root() -> std::io::Result<PathBuf> {
         let mut dir =
             std::env::current_dir().map_err(|_| Error::other("Failed to read filesystem"))?;
@@ -93,7 +103,6 @@ impl RepoRust {
         Ok(())
     }
 
-    // FIX - 1
     pub fn ls_tree(args: &ArgMatches) -> std::io::Result<()> {
         let tree = Tree::decode_object(args)?;
         println!("{tree}");
