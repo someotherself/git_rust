@@ -1,9 +1,10 @@
 use clap::ArgMatches;
+use thread_local::ThreadLocal;
 use std::{
     fs,
     io::Error,
     path::PathBuf,
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
 
 use crate::{
@@ -11,21 +12,24 @@ use crate::{
 };
 
 pub const BASE_DIR: &str = ".git_rust";
-
-pub static REPO: OnceLock<Arc<RepoRust>> = OnceLock::new();
+pub static REPO: ThreadLocal<Arc<RepoRust>> = ThreadLocal::new();
+// pub static REPO: OnceLock<Arc<RepoRust>> = OnceLock::new();
 
 pub struct RepoRust {
     pub base_path: PathBuf,
 }
 
+#[allow(dead_code)]
 impl RepoRust {
     pub fn new_repo(path: &str) -> std::io::Result<()> {
         let repo = RepoRust {
             base_path: path.into(),
         };
-        REPO.set(Arc::new(repo))
+
+        REPO.get_or(|| Arc::new(repo));
+        // REPO.set(Arc::new(repo))
             // Error
-            .map_err(|_| Error::other("Failed to read filesystem"))?;
+            // .map_err(|_| Error::other("Failed to read filesystem"))?;
         Ok(())
     }
 
@@ -36,14 +40,11 @@ impl RepoRust {
 
     pub fn move_repo(_path: &str) -> std::io::Result<()> {
         // Check if path is same as old
-        // Check if a repo already exists
+        // Check if a repo already exists in that dir
         todo!()
     }
 
 pub fn get_root() -> std::io::Result<Arc<RepoRust>> {
-        // handle root not initialized
-        // Check if RustRepo already initialized -> return that repo
-        // If not, search for the path
     if let Some(repo) = REPO.get() {
         return Ok(repo.clone());
     }
@@ -54,7 +55,7 @@ pub fn get_root() -> std::io::Result<Arc<RepoRust>> {
     });
 
     Ok(REPO
-        .get_or_init(|| Arc::new(RepoRust { base_path: dir }))
+        .get_or(|| Arc::new(RepoRust { base_path: dir }))
         .clone())
 }
 
@@ -79,7 +80,7 @@ pub fn get_root() -> std::io::Result<Arc<RepoRust>> {
         let root = RepoRust::get_root()?;
         let head = root.base_path.join(BASE_DIR).join("HEAD");
         if head.try_exists()? {
-            println!("Git already initialized!");
+            return Err(Error::other("Git already initialized!"))
         } else {
             fs::create_dir(root.base_path.join(BASE_DIR))?;
             fs::create_dir(root.base_path.join(BASE_DIR).join("objects"))?;
