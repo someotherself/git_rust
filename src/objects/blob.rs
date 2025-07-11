@@ -102,6 +102,7 @@ impl GitObject for Blob {
 
     // hash-object command
     fn encode_object(args: &ArgMatches) -> std::io::Result<Blob> {
+        dbg!(&args);
         let sub_arg = args.get_flag("write");
         let object = args
             .get_one::<String>("file")

@@ -8,7 +8,6 @@ use clap::{Arg, ArgAction, Command, command};
 use git_rust::RepoRust;
 
 use std::env;
-
 fn main() -> std::io::Result<()> {
     let matches = command!()
         .subcommand(Command::new("init").about("Create an empty git directory"))

@@ -43,6 +43,7 @@ impl Deref for TestDir {
         self.path()
     }
 }
+
 impl AsRef<Path> for TestDir {
     fn as_ref(&self) -> &Path {
         self.path()
@@ -80,7 +81,6 @@ fn hash_object_mock(args: Vec<&str>) -> ArgMatches {
     );
     let mut matches = matches.get_matches_from(args);
     let (_, arg) = matches.remove_subcommand().unwrap();
-    // let (_, Some(arg)) = matches.remove_subcommand().unwrap();
     arg
 }
 
@@ -97,9 +97,6 @@ fn ls_tree_mock(args: Vec<&str>) -> ArgMatches {
 
 pub fn run_test_matches(args: Vec<&str>) -> ArgMatches {
     match args[1] {
-        "init" => {
-            todo!()
-        }
         "cat-file" => return cat_file_mock(args),
         "hash-object" => return hash_object_mock(args),
         "ls-tree" => return ls_tree_mock(args),
