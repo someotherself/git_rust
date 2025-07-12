@@ -31,12 +31,15 @@ impl RepoRust {
     }
 
     // TODO
+    // Used to add an existing repo to RepoRust
     pub fn change_path(_path: &str) -> std::io::Result<()> {
         // Check if path is same as old
         todo!()
     }
 
     // TODO
+    // Used to add an existing repo.
+    // Will change the path in RepoRust and move in storage
     pub fn move_repo(_path: &str) -> std::io::Result<()> {
         // Check if path is same as old
         // Check if a repo already exists in that dir

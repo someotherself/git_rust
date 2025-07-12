@@ -3,6 +3,7 @@
 git-rust is a simplified Git implementation built from scratch in Rust. It mimics core Git functionality such as init, hash-object, and cat-file, and serves both as a learning project and a functional Git-like CLI.
 
 This project explores how Git works under the hood — from creating repositories and hashing objects, to writing Git-compliant blob files and reading them back from the .git/objects directory.
+
 ✨ Current Features
 
     git-rust init — Initialize a new Git-like repository. Does not re-initialize a repo.
