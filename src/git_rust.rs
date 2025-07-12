@@ -111,4 +111,16 @@ impl RepoRust {
         println!("{tree}");
         Ok(())
     }
+
+    pub fn add(_args: &ArgMatches) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    pub fn ls_files(_args: &ArgMatches) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    pub fn write_tree(_args: &ArgMatches) -> std::io::Result<()> {
+        Ok(())
+    }
 }

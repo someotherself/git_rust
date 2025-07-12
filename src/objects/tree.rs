@@ -1,5 +1,5 @@
+use std::fmt::Display;
 use std::io::Read;
-use std::{fmt::Display, path::PathBuf};
 
 use clap::ArgMatches;
 use flate2::bufread::ZlibDecoder;
@@ -82,26 +82,26 @@ impl Tree {
         Ok(entries)
     }
 
-    pub fn write_trees(dir: PathBuf) -> std::io::Result<()> {
-        // Initialize tree object
-        for node in dir.read_dir()? {
-            let node = node?;
+    // pub fn write_trees(dir: PathBuf) -> std::io::Result<()> {
+    //     // Initialize tree object
+    //     for node in dir.read_dir()? {
+    //         let node = node?;
 
-            match node.file_type()? {
-                n if n.is_dir() => {
-                    Tree::write_trees(node.path())?;
-                }
-                n if n.is_file() => {
-                    // Write blob
-                    // return SHA-1
-                }
-                _ => continue,
-            }
-        }
-        // Write the contents of the tree object
-        // Return SHA-1 of the tree object
-        todo!()
-    }
+    //         match node.file_type()? {
+    //             n if n.is_dir() => {
+    //                 Tree::write_trees(node.path())?;
+    //             }
+    //             n if n.is_file() => {
+    //                 // Write blob
+    //                 // return SHA-1
+    //             }
+    //             _ => continue,
+    //         }
+    //     }
+    //     // Write the contents of the tree object
+    //     // Return SHA-1 of the tree object
+    //     todo!()
+    // }
 }
 
 impl GitObject for Tree {

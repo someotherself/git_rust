@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[test]
-fn init_repo_in_temp_folder() {
+fn test_init_repo_in_temp_folder() {
     run_test(|setup| {
         let path = &setup.dir;
 
@@ -23,7 +23,7 @@ fn init_repo_in_temp_folder() {
 }
 
 #[test]
-fn init_repo_struct_in_temp_folder() {
+fn test_init_repo_struct_in_temp_folder() {
     run_test(|setup| {
         let path = &setup.dir;
 

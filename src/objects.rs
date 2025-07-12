@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::fmt::Display;
+use std::{fmt::Display, path::PathBuf};
 
 use clap::ArgMatches;
 
@@ -41,6 +41,12 @@ impl Header {
             object: ObjectType::Tree,
             size,
         })
+    }
+}
+
+impl ObjectType {
+    fn get_mode(_path: PathBuf) -> std::io::Result<()> {
+        todo!()
     }
 }
 

@@ -1,4 +1,5 @@
 mod git_rust;
+mod index;
 mod objects;
 
 #[cfg(test)]
@@ -61,6 +62,9 @@ fn main() -> std::io::Result<()> {
         Some(("cat-file", args)) => RepoRust::cat_file(args)?,
         Some(("hash-object", args)) => RepoRust::hash_object(args)?,
         Some(("ls-tree", args)) => RepoRust::ls_tree(args)?,
+        Some(("add", args)) => RepoRust::add(args)?,
+        Some(("ls-files", args)) => RepoRust::ls_files(args)?,
+        Some(("write-tree", args)) => RepoRust::write_tree(args)?,
         Some((_, _)) => {}
         None => {}
     }
