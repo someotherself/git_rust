@@ -130,6 +130,7 @@ fn test_git_add_file() {
         file.write_all(b"this is a test").unwrap();
 
         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
         let index_path = &git_rust::RepoRust::get_root()
             .unwrap()
             .base_path
@@ -140,12 +141,15 @@ fn test_git_add_file() {
         let result = git_rust::RepoRust::add(&add_args);
         assert!(result.is_ok());
         result.unwrap();
-        dbg!(index_path);
+        dbg!(&index_path);
         assert!(index_path.exists());
         let read_index = Index::read_index();
         assert!(read_index.is_ok());
+        let index = read_index.unwrap();
 
-        // let index = read_index.unwrap();
-        // dbg!(index.header.entries);
+        dbg!(index.header.sign);
+        dbg!(index.header.version);
+        dbg!(index.header.entries);
+        dbg!(index.entries);
     });
 }

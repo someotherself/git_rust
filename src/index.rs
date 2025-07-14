@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 
 use core::fmt;
-use std::{collections::BTreeMap, fmt::Display, os::unix::fs::MetadataExt, path::PathBuf};
+use std::{
+    collections::BTreeMap, fmt::Display, io::Write, os::unix::fs::MetadataExt, path::PathBuf,
+};
 
 use sha1::{Digest, Sha1};
 
@@ -184,9 +186,10 @@ impl Index {
     //      C. Path exists and SHA1 is same              -> Move on
     pub fn build_index(path: String) -> std::io::Result<()> {
         let root = &RepoRust::get_root()?.base_path;
-        let mut index = Index::default();
+        // let mut index = Index::default();
+        let mut entries: BTreeMap<String, IndexEntry> = BTreeMap::new();
         if root.join(BASE_DIR).join("INDEX").exists() {
-            index = Index::read_index()?;
+            entries = Index::read_index()?.entries;
         }
         let path = PathBuf::from(path);
         let mut stack = vec![path.clone()];
@@ -207,16 +210,14 @@ impl Index {
                 } // If yes, move on
 
                 // 3. Check if blob exists in index
-                match index.entries.get(&key) {
+                match entries.get(&key) {
                     // A.Path does not exist in index -> Add to index
                     None => {
-                        index.entries.insert(key, entry.clone());
-                        index = Index::update_index_entry(path.clone(), entry, index)?;
+                        entries.insert(key, entry.clone());
                     }
                     // B. Path exists and SHA1 is different -> Update index
                     Some(existing_entry) if existing_entry.sha1 != entry.sha1 => {
-                        index.entries.insert(key, entry.clone());
-                        index = Index::update_index_entry(path.clone(), entry, index)?;
+                        entries.insert(key, entry.clone());
                     }
                     // C. Path exists and SHA1 is same
                     _ => {}
@@ -232,7 +233,11 @@ impl Index {
                 }
             }
         }
-        Index::write_index_to_file(index)?;
+
+        // Create and update the index
+        let header = IndexHeader::from_entries(entries.len() as u32);
+        let index = Index { header, entries };
+        index.write_index_to_file()?;
         Ok(())
     }
 
@@ -261,8 +266,8 @@ impl Index {
 
         let path_str = path.to_string_lossy();
         let name_len = path_str.len();
-        let assume_valid = false;
-        let extended = false;
+        let assume_valid = 0_u8;
+        let extended = 0_u8;
         let stage = 0b00;
         let name_len_field = if name_len >= 0xFFF {
             0xFFF
@@ -298,42 +303,29 @@ impl Index {
         Ok(entry)
     }
 
-    fn write_index_to_file(index: Index) -> std::io::Result<()> {
+    fn write_index_to_file(&self) -> std::io::Result<()> {
+        let mut buffer = Vec::new();
         let index_path = &RepoRust::get_root()?.base_path.join(BASE_DIR).join("INDEX");
-        if !index_path.exists() {
-            std::fs::File::create_new(index_path)?;
-        }
-        let header = index.header();
+
+        let header = self.header();
         let header_bytes = header.to_bytes();
-        std::fs::write(index_path, header_bytes)?;
-        for (_, entry) in index.entries.iter() {
-            std::fs::write(index_path, entry.to_bytes())?;
+        buffer.extend_from_slice(&header_bytes);
+        for (_, entry) in self.entries.iter() {
+            buffer.extend_from_slice(&entry.to_bytes());
         }
+
+        let mut hasher = Sha1::new();
+        hasher.update(&buffer);
+        let checksum = hasher.finalize();
+
+        let mut file = std::fs::File::create(index_path)?;
+        file.write_all(&buffer)?;
+        file.write_all(&checksum)?;
         Ok(())
     }
 
-    fn update_index_entry(
-        path: PathBuf,
-        entry: IndexEntry,
-        mut index: Index,
-    ) -> std::io::Result<Index> {
-        let path = path.to_string_lossy().to_string();
-        match index.entries.get(&path) {
-            None => {
-                // Add the entry
-                index.entries.insert(path, entry);
-            }
-            Some(e) if entry.sha1 != e.sha1 => {
-                // Update the existing entry
-                index.entries.insert(path, entry);
-            }
-            _ => {}
-        }
-        Ok(index)
-    }
-
     pub fn read_index() -> std::io::Result<Index> {
-        let index_path = &RepoRust::get_root()?.base_path.join("INDEX");
+        let index_path = &RepoRust::get_root()?.base_path.join(BASE_DIR).join("INDEX");
         let file = std::fs::read(index_path)?;
 
         // Parse header

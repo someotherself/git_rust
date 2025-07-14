@@ -93,8 +93,8 @@ impl GitObject for Blob {
     }
 
     fn write_object_to_file(&self, file: Vec<u8>) -> std::io::Result<()> {
-        let root_path = &RepoRust::get_root()?.base_path;
-        let folder_path = root_path.join(&self.folder);
+        let objects_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
+        let folder_path = objects_path.join(&self.folder);
         let file_path = folder_path.join(&self.file);
         if !folder_path.exists() {
             std::fs::create_dir(folder_path)?;
