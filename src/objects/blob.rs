@@ -48,7 +48,7 @@ impl Blob {
         })
     }
 
-    fn blob_with_sha1(file: Vec<u8>) -> std::io::Result<Self> {
+    pub fn blob_with_sha1(file: Vec<u8>) -> std::io::Result<Self> {
         let mut hasher = Sha1::new();
         hasher.update(format!("blob {}\0", file.len()).as_bytes());
         hasher.update(&file);
@@ -73,6 +73,13 @@ impl Blob {
         let mut buffer = Vec::new();
         decompressed.read_to_end(&mut buffer)?;
         Ok(buffer)
+    }
+
+    pub fn blob_exists(hash: String) -> std::io::Result<bool> {
+        let root = &RepoRust::get_root()?.base_path;
+        let obj_path = RepoRust::get_object_folder(root.clone())?;
+        let (folder_name, file_name) = hash.split_at(2);
+        Ok(obj_path.join(folder_name).join(file_name).exists())
     }
 }
 
@@ -103,6 +110,7 @@ impl GitObject for Blob {
 
     // hash-object command
     fn encode_object(args: &ArgMatches) -> std::io::Result<Blob> {
+        // TODO: Check if blob already exists. Add test for it.
         let sub_arg = args.get_flag("write");
         let object = args
             .get_one::<String>("file")

@@ -112,8 +112,9 @@ impl GitObject for Tree {
         &self.header
     }
 
-    // write-tree
+    // write-tree TODO
     fn encode_object(args: &ArgMatches) -> std::io::Result<Tree> {
+        // TODO: Check if blob already exists. Add test for it.
         // let sub_arg = args.get_flag("___");
         let _object = args
             .get_one::<String>("file")

@@ -1,17 +1,23 @@
 #![allow(dead_code)]
 
 use core::fmt;
-use std::{fmt::Display, io::Error, os::unix::fs::MetadataExt, path::PathBuf};
+use std::{collections::BTreeMap, fmt::Display, os::unix::fs::MetadataExt, path::PathBuf};
 
 use sha1::{Digest, Sha1};
 
-use crate::git_rust::{BASE_DIR, RepoRust};
+use crate::{
+    git_rust::{BASE_DIR, RepoRust},
+    objects::{GitObject, blob::Blob},
+};
 
+#[derive(Default)]
 pub struct Index {
     header: IndexHeader,
-    entries: Vec<IndexEntry>,
+    // (path, IndexEntry)
+    entries: BTreeMap<String, IndexEntry>,
 }
 
+#[derive(Default)]
 pub struct IndexHeader {
     pub sign: [u8; 4],
     pub version: u32,
@@ -42,7 +48,7 @@ pub struct IndexEntry {
     pub uid: u32,
     pub gid: u32,
     pub file_size: u32,
-    pub object_id: [u8; 20],
+    pub sha1: [u8; 20],
     pub flags: u16,
 }
 
@@ -59,19 +65,70 @@ impl Index {
         &self.header
     }
 
-    fn build_index(path: String) -> std::io::Result<Index> {
+    // TODO have a separate function that update index file and presists to disk
+    // git add
+    // Create the index if it doesn't exist, or creates a new one
+    // Creates blobs for each object, but not trees.
+    // Checks if blobs and entries already exist.
+    //
+    // A blob can exist on disk but not in the index (git hash-object -w)
+    // A blob cannot exist in the index, but not on disk
+    // 1. Get entry - index the file
+    // 2. Check if blob already exists on disk
+    //  If yes - Move on (to Check if it exists in index)
+    //  If no - Create the file. Move on (to Check if it exists in index)
+    // 3. Paths now merge. Check if blob exists in index
+    //      A. Path exists and SHA1 is different         -> Update index. Persist change
+    //      B. Path does not exist in index              -> Add to index. Persist change
+    //      C. Path exists and SHA1 is same              -> Move on
+    fn update_index(path: String) -> std::io::Result<Index> {
         let root = &RepoRust::get_root()?.base_path;
+        let mut index = Index::default();
         if root.join(BASE_DIR).join("INDEX").exists() {
-            return Err(Error::other("INDEX already exists"));
+            // Read the index to the struct TODO
         }
-        let mut entries: Vec<IndexEntry> = Vec::new();
         let path = PathBuf::from(path);
-        if path.is_file() {
-            entries.push(Index::index_file(path)?);
-        } else if path.is_dir() {
-            // entries = Index::index_dir(path)?;
+        let mut stack = vec![path];
+
+        while let Some(current_path) = stack.pop() {
+            if current_path.is_file() {
+                // 1. Get entry - index the file
+                let entry = Index::index_file(current_path.clone())?;
+                let key: String = current_path.to_string_lossy().into();
+
+                // 2. Check if blob already exists on disk
+                if !Blob::blob_exists(String::from_utf8(entry.sha1.to_vec()).unwrap())? {
+                    // If no - Create the file
+                    let file = std::fs::read(current_path)?;
+                    let blob = Blob::blob_with_sha1(file.clone())?;
+                    blob.write_object_to_file(file)?;
+                } // If yes, move on
+
+                // 3. Check if blob exists in index
+                match index.entries.get(&key) {
+                    // A.Path does not exist in index -> Add to index.
+                    None => {
+                        index.entries.insert(key, entry);
+                    }
+                    // B. Path exists and SHA1 is different -> Update index. Persist change
+                    Some(existing_entry) if existing_entry.sha1 != entry.sha1 => {
+                        // Persist to file
+                        // TODO
+                    }
+                    // C. Path exists and SHA1 is same
+                    _ => continue,
+                }
+            } else if current_path.is_dir() {
+                if current_path.ends_with(".git_rust") {
+                    continue;
+                }
+
+                for entry in std::fs::read_dir(current_path)? {
+                    let entry = entry?.path();
+                    stack.push(entry);
+                }
+            }
         }
-        // Build the index and return
         todo!()
     }
 
@@ -80,24 +137,6 @@ impl Index {
         hasher.update(&file);
         let result = hasher.finalize();
         Ok(result.into())
-    }
-
-    fn index_dir(path: PathBuf) -> std::io::Result<Vec<IndexEntry>> {
-        let mut _entries: Vec<IndexEntry> = Vec::new();
-        for node in path.read_dir()? {
-            let node = node?;
-            match node.file_type()? {
-                n if n.is_dir() => {
-                    // recurse???
-                }
-                n if n.is_file() => {
-                    // write entry
-                    // return SHA-1
-                }
-                _ => continue,
-            }
-        }
-        todo!()
     }
 
     #[allow(unused_variables)]
@@ -114,8 +153,8 @@ impl Index {
         let gid = metadata.gid();
         let file_size = metadata.size() as u32;
 
-        let file = std::fs::read(PathBuf::from(&path))?;
-        let object_id = Index::sha1_entry(file)?;
+        let file = std::fs::read(&path)?;
+        let sha1 = Index::sha1_entry(file)?;
 
         let path_str = path.to_string_lossy();
         let name_len = path_str.len();
@@ -146,13 +185,11 @@ impl Index {
             uid,
             gid,
             file_size,
-            object_id,
+            sha1,
             flags,
         };
         Ok(entry)
     }
-
-    fn update_index() {}
 }
 
 impl fmt::Display for IndexEntry {
