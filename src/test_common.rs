@@ -84,6 +84,17 @@ fn hash_object_mock(args: Vec<&str>) -> ArgMatches {
     arg
 }
 
+fn add_mock(args: Vec<&str>) -> ArgMatches {
+    let matches = command!().subcommand(
+        Command::new("add")
+            .about("Update the index using the content found in the working tree.")
+            .arg(Arg::new("path").required(true).value_name("path")),
+    );
+    let mut matches = matches.get_matches_from(args);
+    let (_, arg) = matches.remove_subcommand().unwrap();
+    arg
+}
+
 fn ls_tree_mock(args: Vec<&str>) -> ArgMatches {
     let matches = command!().subcommand(
         Command::new("ls-tree")
@@ -100,6 +111,7 @@ pub fn run_test_matches(args: Vec<&str>) -> ArgMatches {
         "cat-file" => return cat_file_mock(args),
         "hash-object" => return hash_object_mock(args),
         "ls-tree" => return ls_tree_mock(args),
+        "add" => return add_mock(args),
         _ => panic!("Wrong test command!"),
     }
 }

@@ -2,7 +2,10 @@ use clap::ArgMatches;
 use std::{fs, io::Error, path::PathBuf, sync::Arc};
 use thread_local::ThreadLocal;
 
-use crate::objects::{GitObject, blob::Blob, tree::Tree};
+use crate::{
+    index::Index,
+    objects::{GitObject, blob::Blob, tree::Tree},
+};
 
 pub const BASE_DIR: &str = ".git_rust";
 
@@ -112,7 +115,12 @@ impl RepoRust {
         Ok(())
     }
 
-    pub fn add(_args: &ArgMatches) -> std::io::Result<()> {
+    pub fn add(args: &ArgMatches) -> std::io::Result<()> {
+        let path = args
+            .get_one::<String>("path")
+            .expect("File is required.")
+            .to_owned();
+        Index::build_index(path)?;
         Ok(())
     }
 

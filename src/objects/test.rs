@@ -1,7 +1,8 @@
 use std::io::Write;
 
 use crate::{
-    git_rust,
+    git_rust::{self, BASE_DIR},
+    index::Index,
     objects::{GitObject, blob},
     test_common::{run_test, run_test_matches},
 };
@@ -114,5 +115,37 @@ fn test_repo_in_project_dir() {
         }
         assert!(cur_repo.exists());
         assert!(!new_repo.exists());
+    });
+}
+
+#[test]
+fn test_git_add_file() {
+    run_test(|setup| {
+        // Get test dir
+        let path = &setup.dir;
+        // Create file to hash
+        let file_path = path.join("test1.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(b"this is a test").unwrap();
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        let index_path = &git_rust::RepoRust::get_root()
+            .unwrap()
+            .base_path
+            .join(BASE_DIR)
+            .join("INDEX");
+
+        let add_args = run_test_matches(vec!["", "add", &format!("{}", file_path_str)]);
+        let result = git_rust::RepoRust::add(&add_args);
+        assert!(result.is_ok());
+        result.unwrap();
+        dbg!(index_path);
+        assert!(index_path.exists());
+        let read_index = Index::read_index();
+        assert!(read_index.is_ok());
+
+        // let index = read_index.unwrap();
+        // dbg!(index.header.entries);
     });
 }

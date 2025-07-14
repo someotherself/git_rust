@@ -75,10 +75,11 @@ impl Blob {
         Ok(buffer)
     }
 
-    pub fn blob_exists(hash: String) -> std::io::Result<bool> {
+    pub fn blob_exists(hash: [u8; 20]) -> std::io::Result<bool> {
         let root = &RepoRust::get_root()?.base_path;
         let obj_path = RepoRust::get_object_folder(root.clone())?;
-        let (folder_name, file_name) = hash.split_at(2);
+        let hex_hash = hex::encode(hash);
+        let (folder_name, file_name) = hex_hash.split_at(2);
         Ok(obj_path.join(folder_name).join(file_name).exists())
     }
 }
@@ -92,7 +93,7 @@ impl GitObject for Blob {
     }
 
     fn write_object_to_file(&self, file: Vec<u8>) -> std::io::Result<()> {
-        let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
+        let root_path = &RepoRust::get_root()?.base_path;
         let folder_path = root_path.join(&self.folder);
         let file_path = folder_path.join(&self.file);
         if !folder_path.exists() {
