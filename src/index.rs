@@ -168,6 +168,11 @@ impl Index {
         &self.header
     }
 
+    fn from_entries(entries: BTreeMap<String, IndexEntry>) -> Index {
+        let header = IndexHeader::from_entries(entries.len() as u32);
+        Index { header, entries }
+    }
+
     // TODO have a separate function that update index file and presists to disk
     // git add
     // Create the index if it doesn't exist, or creates a new one
@@ -235,8 +240,7 @@ impl Index {
         }
 
         // Create and update the index
-        let header = IndexHeader::from_entries(entries.len() as u32);
-        let index = Index { header, entries };
+        let index = Index::from_entries(entries);
         index.write_index_to_file()?;
         Ok(())
     }
