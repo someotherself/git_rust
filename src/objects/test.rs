@@ -1,4 +1,4 @@
-use std::{io::Write, os::unix::fs::MetadataExt, path::PathBuf, result};
+use std::{io::Write, os::unix::fs::MetadataExt, path::PathBuf};
 
 use crate::{
     git_rust::{self, BASE_DIR},
@@ -10,8 +10,7 @@ use crate::{
 #[test]
 fn test_init_repo_in_temp_folder() {
     run_test(|setup| {
-        let mut input = setup.lock().unwrap();
-        let setup = input.take().unwrap();
+        let setup = setup.lock().unwrap().take().unwrap();
         let path = &setup.dir;
 
         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
@@ -28,8 +27,7 @@ fn test_init_repo_in_temp_folder() {
 #[test]
 fn test_init_repo_struct_in_temp_folder() {
     run_test(|setup| {
-        let mut input = setup.lock().unwrap();
-        let setup = input.take().unwrap();
+        let setup = setup.lock().unwrap().take().unwrap();
         let path = &setup.dir;
 
         let result = git_rust::RepoRust::new_repo(path.to_str().unwrap());
@@ -103,8 +101,7 @@ fn test_hash_file_without_w() {
 fn test_hash_file_in_temp_folder() {
     run_test(|setup| {
         // Get test dir
-        let mut input = setup.lock().unwrap();
-        let setup = input.take().unwrap();
+        let setup = setup.lock().unwrap().take().unwrap();
         let path = &setup.dir;
         // -- Hash a file, compate with git and then
         // Create file to hash
@@ -197,6 +194,19 @@ fn test_hash_file_in_temp_folder() {
     });
 }
 
+#[test]
+fn test_hash_cat_raw_bytes() {
+    run_test(|setup| {
+        let setup = setup.lock().unwrap().take().unwrap();
+        let path = &setup.dir;
+        // Create file to hash
+        let file_path_1 = path.join("test1.txt");
+        let file_path_str_1 = file_path_1.to_str().unwrap();
+        let mut file_1 = std::fs::File::create(&file_path_1).unwrap();
+        file_1.write_all(b"this is a test").unwrap();
+    });
+}
+
 // Can cause damage if other tests fail
 #[test]
 #[ignore]
@@ -239,15 +249,13 @@ fn test_repo_in_project_dir() {
 fn test_git_add_files() {
     run_test(|setup| {
         // Get test dir
-        let mut input = setup.lock().unwrap();
-        let setup = input.take().unwrap();
+        let setup = setup.lock().unwrap().take().unwrap();
         let path = &setup.dir;
         // Create file to hash
         let file_path_1 = path.join("test1.txt");
         let file_path_str_1 = file_path_1.to_str().unwrap();
         let mut file_1 = std::fs::File::create(&file_path_1).unwrap();
         file_1.write_all(b"this is a test").unwrap();
-        file_1.sync_all().unwrap();
 
         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
         git_rust::RepoRust::init().unwrap();
@@ -312,7 +320,6 @@ fn test_git_add_files() {
         let file_path_str_2 = file_path_2.to_str().unwrap();
         let mut file_2 = std::fs::File::create(&file_path_2).unwrap();
         file_2.write_all(b"this is second test").unwrap();
-        file_2.sync_all().unwrap();
 
         let add_args_2 = run_test_matches(vec!["", "add", &format!("{}", file_path_str_2)]);
         let result = git_rust::RepoRust::add(&add_args_2);
@@ -369,15 +376,13 @@ fn test_git_add_files() {
 fn test_git_add_same_file_twice() {
     run_test(|setup| {
         // Get test dir
-        let mut input = setup.lock().unwrap();
-        let setup = input.take().unwrap();
+        let setup = setup.lock().unwrap().take().unwrap();
         let path = &setup.dir;
         // Create file to hash
         let file_path_1 = path.join("test1.txt");
         let file_path_str_1 = file_path_1.to_str().unwrap();
         let mut file_1 = std::fs::File::create(&file_path_1).unwrap();
         file_1.write_all(b"this is a test").unwrap();
-        file_1.sync_all().unwrap();
 
         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
         git_rust::RepoRust::init().unwrap();
@@ -416,7 +421,6 @@ fn test_git_add_folder() {
                 std::fs::File::create_new(path_folder_1.join(format!("file_{}", i))).unwrap();
             file.write_all(format!("This is test file number {}", i).as_bytes())
                 .unwrap();
-            file.sync_all().unwrap()
         }
         assert!(path_folder_1.is_dir());
 
