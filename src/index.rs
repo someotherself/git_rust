@@ -173,7 +173,7 @@ impl Index {
         Index { header, entries }
     }
 
-    // TODO have a separate function that update index file and presists to disk
+    // TODO: Compare metadata when file already exists in index
     // git add
     // Create the index if it doesn't exist, or creates a new one
     // Creates blobs for each object, but not trees.
@@ -191,7 +191,6 @@ impl Index {
     //      C. Path exists and SHA1 is same              -> Move on
     pub fn build_index(path: String) -> std::io::Result<()> {
         let root = &RepoRust::get_root()?.base_path;
-        // let mut index = Index::default();
         let mut entries: BTreeMap<String, IndexEntry> = BTreeMap::new();
         if root.join(BASE_DIR).join("INDEX").exists() {
             entries = Index::read_index()?.entries;
@@ -210,7 +209,6 @@ impl Index {
                     // If no - Create the file
                     let file = std::fs::read(current_path)?;
                     let blob = Blob::blob_with_sha1(file.clone())?;
-                    // TODO file not found
                     blob.write_object_to_file(file)?;
                 } // If yes, move on
 

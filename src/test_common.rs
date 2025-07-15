@@ -30,7 +30,6 @@ impl TestDir {
     }
 }
 
-#[track_caller]
 pub fn run_test<T>(f: T)
 where
     T: FnOnce(&Mutex<Option<TestSetup>>) + Send + 'static,

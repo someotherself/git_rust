@@ -279,5 +279,13 @@ fn test_git_add_same_file_twice() {
         assert_eq!(index.header.sign, [b'D', b'I', b'R', b'C']);
         assert_eq!(index.header.version, 2_u32.to_be_bytes());
         assert_eq!(index.header.entries, 1_u32.to_be_bytes());
+
+        // INDEX the same file again
+        git_rust::RepoRust::add(&add_args).unwrap();
+        let index = Index::read_index().unwrap();
+
+        assert_eq!(index.header.sign, [b'D', b'I', b'R', b'C']);
+        assert_eq!(index.header.version, 2_u32.to_be_bytes());
+        assert_eq!(index.header.entries, 1_u32.to_be_bytes());
     });
 }
