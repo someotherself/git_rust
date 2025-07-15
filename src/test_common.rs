@@ -27,7 +27,7 @@ impl TestDir {
     }
 }
 
-#[allow(dead_code)]
+#[track_caller]
 pub fn run_test<T>(f: T)
 where
     T: FnOnce(&TestSetup),

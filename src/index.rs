@@ -245,8 +245,9 @@ impl Index {
         Ok(())
     }
 
-    fn sha1_entry(file: Vec<u8>) -> std::io::Result<[u8; 20]> {
+    pub fn sha1_entry(file: Vec<u8>) -> std::io::Result<[u8; 20]> {
         let mut hasher = Sha1::new();
+        hasher.update(format!("blob {}\0", file.len()).as_bytes());
         hasher.update(&file);
         let result = hasher.finalize();
         Ok(result.into())
