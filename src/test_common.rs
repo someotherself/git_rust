@@ -1,6 +1,9 @@
 use clap::{Arg, ArgAction, ArgMatches, Command, command};
-use std::{ops::Deref, path::Path};
+use std::{ops::Deref, path::Path, sync::Mutex};
 use tempfile::{Builder, TempDir};
+use thread_local::ThreadLocal;
+
+pub static SETUP_RESULT: ThreadLocal<Mutex<Option<TestSetup>>> = ThreadLocal::new();
 
 pub struct TestDir {
     root: TempDir,
@@ -30,11 +33,15 @@ impl TestDir {
 #[track_caller]
 pub fn run_test<T>(f: T)
 where
-    T: FnOnce(&TestSetup),
+    T: FnOnce(&Mutex<Option<TestSetup>>) + Send + 'static,
 {
-    let dir = TestDir::new_dir();
-    let r = TestSetup { dir };
-    f(&r);
+    let setup = SETUP_RESULT.get_or(|| Mutex::new(None));
+    {
+        let dir = TestDir::new_dir();
+        let mut setup = setup.lock().unwrap();
+        *setup = Some(TestSetup { dir });
+    }
+    f(setup);
 }
 
 impl Deref for TestDir {

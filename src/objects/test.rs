@@ -10,6 +10,8 @@ use crate::{
 #[test]
 fn test_init_repo_in_temp_folder() {
     run_test(|setup| {
+        let mut input = setup.lock().unwrap();
+        let setup = input.take().unwrap();
         let path = &setup.dir;
 
         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
@@ -26,6 +28,8 @@ fn test_init_repo_in_temp_folder() {
 #[test]
 fn test_init_repo_struct_in_temp_folder() {
     run_test(|setup| {
+        let mut input = setup.lock().unwrap();
+        let setup = input.take().unwrap();
         let path = &setup.dir;
 
         let result = git_rust::RepoRust::new_repo(path.to_str().unwrap());
@@ -41,13 +45,14 @@ fn test_init_repo_struct_in_temp_folder() {
 fn test_hash_file_in_temp_folder() {
     run_test(|setup| {
         // Get test dir
+        let mut input = setup.lock().unwrap();
+        let setup = input.take().unwrap();
         let path = &setup.dir;
         // Create file to hash
         let file_path = path.join("test1.txt");
         let file_path_str = file_path.to_str().unwrap();
         let mut file = std::fs::File::create(&file_path).unwrap();
         file.write_all(b"this is a test").unwrap();
-        let file = std::fs::File::create(&file_path).unwrap();
 
         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
         let args = run_test_matches(vec!["", "hash-object", "-w", &file_path_str]);
@@ -123,6 +128,8 @@ fn test_repo_in_project_dir() {
 fn test_git_add_files() {
     run_test(|setup| {
         // Get test dir
+        let mut input = setup.lock().unwrap();
+        let setup = input.take().unwrap();
         let path = &setup.dir;
         // Create file to hash
         let file_path_1 = path.join("test1.txt");
@@ -244,5 +251,33 @@ fn test_git_add_files() {
 
         // There should be two entries
         assert_eq!(index.entries.len(), 2);
+    });
+}
+
+#[test]
+fn test_git_add_same_file_twice() {
+    run_test(|setup| {
+        // Get test dir
+        let mut input = setup.lock().unwrap();
+        let setup = input.take().unwrap();
+        let path = &setup.dir;
+        // Create file to hash
+        let file_path_1 = path.join("test1.txt");
+        let file_path_str_1 = file_path_1.to_str().unwrap();
+        let mut file_1 = std::fs::File::create(&file_path_1).unwrap();
+        file_1.write_all(b"this is a test").unwrap();
+        file_1.sync_all().unwrap();
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        // INDEX file once
+        let add_args = run_test_matches(vec!["", "add", &format!("{}", file_path_str_1)]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+        let index = Index::read_index().unwrap();
+
+        assert_eq!(index.header.sign, [b'D', b'I', b'R', b'C']);
+        assert_eq!(index.header.version, 2_u32.to_be_bytes());
+        assert_eq!(index.header.entries, 1_u32.to_be_bytes());
     });
 }
