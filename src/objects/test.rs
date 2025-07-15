@@ -1,4 +1,4 @@
-use std::{io::Write, os::unix::fs::MetadataExt};
+use std::{io::Write, os::unix::fs::MetadataExt, path::PathBuf};
 
 use crate::{
     git_rust::{self, BASE_DIR},
@@ -287,5 +287,49 @@ fn test_git_add_same_file_twice() {
         assert_eq!(index.header.sign, [b'D', b'I', b'R', b'C']);
         assert_eq!(index.header.version, 2_u32.to_be_bytes());
         assert_eq!(index.header.entries, 1_u32.to_be_bytes());
+    });
+}
+
+#[test]
+fn test_git_add_folder() {
+    run_test(|setup| {
+        // Get test dir
+        let mut input = setup.lock().unwrap();
+        let setup = input.take().unwrap();
+        let path = &setup.dir;
+        let path_folder_1 = path.join("folder_1");
+        let path_folder_1_str = path_folder_1.to_str().unwrap();
+        std::fs::create_dir_all(&path_folder_1).unwrap();
+        for i in 0..5 {
+            let mut file =
+                std::fs::File::create_new(path_folder_1.join(format!("file_{}", i))).unwrap();
+            file.write_all(format!("This is test file number {}", i).as_bytes())
+                .unwrap();
+            file.sync_all().unwrap()
+        }
+        assert!(path_folder_1.is_dir());
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        // INDEX the folder
+        let add_args = run_test_matches(vec!["", "add", path_folder_1_str]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+        let _index = Index::read_index().unwrap();
+
+        let read_index = Index::read_index();
+        assert!(read_index.is_ok());
+        let index = read_index.unwrap();
+
+        assert_eq!(index.header.sign, [b'D', b'I', b'R', b'C']);
+        assert_eq!(index.header.version, 2_u32.to_be_bytes());
+        assert_eq!(index.header.entries, 5_u32.to_be_bytes());
+
+        for (idx, (path, _entry)) in index.entries.iter().enumerate() {
+            assert_eq!(
+                PathBuf::from(path),
+                path_folder_1.join(format!("file_{}", idx))
+            )
+        }
     });
 }

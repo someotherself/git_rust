@@ -105,7 +105,6 @@ impl IndexEntry {
         // Pad to 8-byte alignment
         let padding = (8 - (buf.len() % 8)) % 8;
         buf.extend(vec![0u8; padding]);
-
         buf
     }
 
@@ -131,14 +130,29 @@ impl IndexEntry {
 
         // File size is in the last 12 bits of the 2 byte flags
         let name_len = (flags & 0x0FFF) as usize;
-        // 62 bytes already read until the end of flags
-        let name_end = 62 + name_len;
+        // 62 bytes already read
+        let name_start = 62;
+        // Add the length of the name
+        let name_end = name_start + name_len;
+
+        if buf.len() <= name_end {
+            return Err(std::io::Error::other("Path data exceeds buffer"));
+        }
+
         let path = buf[62..name_end].to_vec();
 
-        // Calculate padding to next 8-byte boundary
-        let mut total_size = name_end;
-        while total_size % 8 != 0 {
-            total_size += 1;
+        if buf[name_end] != 0 {
+            return Err(std::io::Error::other("Path is not null-terminated"));
+        }
+
+        // Add the null termination
+        let base_size = name_end + 1;
+
+        let padding = (8 - (base_size % 8)) % 8;
+        let total_size = base_size + padding;
+
+        if buf.len() < total_size {
+            return Err(std::io::Error::other("Entry buffer too small for padding"));
         }
 
         Ok((
@@ -283,10 +297,8 @@ impl Index {
             | name_len_field;
 
         let path_bytes = path_str.as_bytes();
-        let padding = (8 - ((62 + path_bytes.len()) % 8)) % 8;
         let mut buf = vec![];
         buf.extend(path_bytes);
-        buf.extend(std::iter::repeat_n(0, padding));
 
         let entry = IndexEntry {
             ctime,
