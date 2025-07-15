@@ -10,12 +10,15 @@ pub mod tree;
 
 #[cfg(test)]
 mod test;
+
+#[derive(Debug)]
 pub enum ObjectType {
     Blob,
     Tree,
     Commit,
 }
 
+#[derive(Debug)]
 pub struct Header {
     pub(crate) object: ObjectType,
     pub(crate) size: usize,

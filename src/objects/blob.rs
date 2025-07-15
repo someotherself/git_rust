@@ -14,11 +14,18 @@ use crate::{
     objects::{GitObject, Header, ObjectType, blob},
 };
 
+#[derive(Debug)]
 pub(crate) struct Blob {
     pub(crate) header: Header,
     pub(crate) hash: String,
     pub(crate) folder: String,
     pub(crate) file: String,
+}
+
+impl PartialEq for Blob {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
 }
 
 impl Blob {

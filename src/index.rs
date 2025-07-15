@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use core::fmt;
 use std::{
     collections::BTreeMap, fmt::Display, io::Write, os::unix::fs::MetadataExt, path::PathBuf,

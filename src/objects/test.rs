@@ -1,4 +1,4 @@
-use std::{io::Write, os::unix::fs::MetadataExt, path::PathBuf};
+use std::{io::Write, os::unix::fs::MetadataExt, path::PathBuf, result};
 
 use crate::{
     git_rust::{self, BASE_DIR},
@@ -42,12 +42,71 @@ fn test_init_repo_struct_in_temp_folder() {
 }
 
 #[test]
+fn test_hash_file_without_init() {
+    run_test(|setup| {
+        let setup = setup.lock().unwrap().take().unwrap();
+        let path = &setup.dir;
+
+        // -- Try hashing '-w' without initalizing repo
+        let file_path = path.join("test1.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(b"this is a test").unwrap();
+
+        let args_1 = run_test_matches(vec!["", "hash-object", "-w", &file_path_str]);
+        let result_1 = blob::Blob::encode_object(&args_1);
+        // SHOULD BE ERROR TODO
+        assert!(result_1.is_ok());
+        // -- Without '-w' should still work
+
+        let args_2 = run_test_matches(vec!["", "hash-object", &file_path_str]);
+        let result_2 = blob::Blob::encode_object(&args_2);
+        // Should be ok
+        assert!(result_2.is_ok());
+    });
+}
+
+#[test]
+fn test_hash_file_without_w() {
+    run_test(|setup| {
+        let setup = setup.lock().unwrap().take().unwrap();
+        let path = &setup.dir;
+
+        // -- Try hashing '-w' without initalizing repo
+        let file_path = path.join("test1.txt");
+        let file_path_str = file_path.to_str().unwrap();
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(b"this is a test").unwrap();
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+        let args = run_test_matches(vec!["", "hash-object", &file_path_str]);
+
+        let git_rust_hash = blob::Blob::encode_object(&args).unwrap();
+
+        let (folder_name, file_name) = git_rust_hash.hash.split_at(2);
+        let folder_path = path.join(BASE_DIR).join("objects").join(folder_name);
+        let file_path = folder_path.join(file_name);
+        // Make sure objects folder exists
+        assert!(path.join(BASE_DIR).join("objects").exists());
+        // Make sure blob does not exist
+        assert!(!file_path.exists());
+        assert!(!folder_path.exists());
+        // Make sure the objects folder is empty
+        let mut entries = path.join(BASE_DIR).join("objects").read_dir().unwrap();
+        assert!(entries.next().is_none());
+        dbg!(path.join(BASE_DIR).join("objects"));
+    });
+}
+
+#[test]
 fn test_hash_file_in_temp_folder() {
     run_test(|setup| {
         // Get test dir
         let mut input = setup.lock().unwrap();
         let setup = input.take().unwrap();
         let path = &setup.dir;
+        // -- Hash a file, compate with git and then
         // Create file to hash
         let file_path = path.join("test1.txt");
         let file_path_str = file_path.to_str().unwrap();
@@ -65,11 +124,17 @@ fn test_hash_file_in_temp_folder() {
         assert!(git_rust::RepoRust::init().is_err());
         let git_rust_hash = blob::Blob::encode_object(&args).unwrap();
 
+        // -- Hash file again. Make sure hash is the same --
+        let git_rust_hash_dup = blob::Blob::encode_object(&args).unwrap();
+        assert_eq!(git_rust_hash, git_rust_hash_dup);
+
+        // hash-object with git
         use git2::Repository;
         let repo = Repository::init(path.path()).unwrap();
         let blob_oid = repo.blob_path(&file_path).unwrap();
         let git2_hash = repo.find_blob(blob_oid).unwrap();
 
+        // Compare against git
         assert_eq!(git2_hash.id().to_string(), format!("{}", git_rust_hash));
 
         // cat-file the object
@@ -83,6 +148,52 @@ fn test_hash_file_in_temp_folder() {
             format!("{}", str::from_utf8(git2_content).unwrap()),
             format!("{}", git_rust_content)
         );
+
+        // --  Compare hash of files with new line '\n' and without --
+        // Create file to hash
+        let file_path_2 = path.join("test2.txt");
+        let file_path_str_2 = file_path_2.to_str().unwrap();
+        let mut file_2 = std::fs::File::create(&file_path_2).unwrap();
+        file_2.write_all(b"this is a test\n").unwrap();
+
+        // Hash new file
+        let args = run_test_matches(vec!["", "hash-object", "-w", &file_path_str_2]);
+        let git_rust_hash_2 = blob::Blob::encode_object(&args).unwrap();
+
+        // Should not equal
+        assert_ne!(format!("{}", git_rust_hash_2), format!("{}", git_rust_hash));
+
+        // --  Hash a file with no content --
+        // Create file to hash
+        let file_path_3 = path.join("test3.txt");
+        let file_path_str_3 = file_path_3.to_str().unwrap();
+        let mut file_3 = std::fs::File::create(&file_path_3).unwrap();
+        file_3.write_all(b"      ").unwrap();
+
+        // Hash new file
+        let args = run_test_matches(vec!["", "hash-object", "-w", &file_path_str_3]);
+        let git_rust_hash_3 = blob::Blob::encode_object(&args).unwrap();
+
+        // e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 = "blob 0\0"
+        assert_ne!(
+            format!("{}", git_rust_hash_3),
+            "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391".to_string()
+        );
+
+        // -- Hash a non existent file --
+        let args = run_test_matches(vec!["", "hash-object", "-w", "fake_file"]);
+        let result_1 = blob::Blob::encode_object(&args);
+        assert!(result_1.is_err());
+
+        // Hash a dir
+        // Create a dir
+        let dir_1 = path.join("new_dir");
+        let dir_path_str_1 = dir_1.to_str().unwrap();
+        std::fs::create_dir_all(&dir_path_str_1).unwrap();
+
+        let args = run_test_matches(vec!["", "hash-object", "-w", &dir_path_str_1]);
+        let result_2 = blob::Blob::encode_object(&args);
+        assert!(result_2.is_err());
     });
 }
 
@@ -325,11 +436,12 @@ fn test_git_add_folder() {
         assert_eq!(index.header.version, 2_u32.to_be_bytes());
         assert_eq!(index.header.entries, 5_u32.to_be_bytes());
 
-        for (idx, (path, _entry)) in index.entries.iter().enumerate() {
+        for (idx, (path, entry)) in index.entries.iter().enumerate() {
             assert_eq!(
                 PathBuf::from(path),
                 path_folder_1.join(format!("file_{}", idx))
-            )
+            );
+            assert_eq!(entry.flags & 0x0FFF, 67);
         }
     });
 }
