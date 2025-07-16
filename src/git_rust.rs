@@ -1,5 +1,10 @@
 use clap::ArgMatches;
-use std::{fs, io::Error, path::PathBuf, sync::Arc};
+use std::{
+    fs,
+    io::{Error, Write},
+    path::PathBuf,
+    sync::Arc,
+};
 use thread_local::ThreadLocal;
 
 use crate::{
@@ -98,8 +103,15 @@ impl RepoRust {
     }
 
     pub fn cat_file(args: &ArgMatches) -> std::io::Result<()> {
-        let blob = Blob::decode_object(args)?;
-        print!("{blob}");
+        let _sub_arg = args.get_flag("pretty");
+        let hash = args
+            .get_one::<String>("hash")
+            .expect("Hash is required.")
+            .to_owned();
+        // Contents without the header
+        // let blob = Blob::from_hash(hash.clone())?;
+        let contents = Blob::decode_object(hash)?;
+        std::io::stdout().write_all(&contents)?;
         Ok(())
     }
 

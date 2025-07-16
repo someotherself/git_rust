@@ -42,20 +42,17 @@ impl Blob {
     }
 
     // cat-file command
-    pub fn decode_object(args: &ArgMatches) -> std::io::Result<Blob> {
+    pub fn decode_object(hash: String) -> std::io::Result<Vec<u8>> {
         let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
-        let _sub_arg = args.get_flag("pretty");
-        let hash = args
-            .get_one::<String>("hash")
-            .expect("Hash is required.")
-            .to_owned();
-
         let (folder_name, file_name) = hash.split_at(2);
         let file_path = root_path.join(folder_name).join(file_name);
         let file = std::fs::read(file_path)?;
         let bytes_output = Blob::de_compress(file)?;
-        let blob = Blob::new_from_bytes(bytes_output)?;
-        Ok(blob)
+
+        let null_pos = bytes_output.iter().position(|&b| b == b'\0').unwrap();
+        let content_bytes = bytes_output[null_pos + 1..].to_vec();
+        // let contents = Blob::new_from_bytes(bytes_output)?;
+        Ok(content_bytes)
     }
 
     // hash-object command
@@ -91,8 +88,9 @@ impl Blob {
         Ok(())
     }
 
-    fn new_from_bytes(bytes: Vec<u8>) -> std::io::Result<Self> {
-        let null_pos = bytes.iter().position(|&b| b == b'\0').unwrap();
+    // TODO: Incorrect implementation.
+    pub fn new_from_bytes(bytes: Vec<u8>) -> std::io::Result<Self> {
+        let null_pos: usize = bytes.iter().position(|&b| b == b'\0').unwrap();
 
         let header_bytes = &bytes[..null_pos];
         let content_bytes = &bytes[null_pos + 1..];
