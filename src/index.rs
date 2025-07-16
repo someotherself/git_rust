@@ -356,6 +356,11 @@ impl Index {
         }
         Ok(Index { header, entries })
     }
+
+    pub fn ls_index() -> std::io::Result<BTreeMap<String, IndexEntry>> {
+        let index = Index::read_index()?;
+        Ok(index.entries)
+    }
 }
 
 impl fmt::Display for IndexEntry {

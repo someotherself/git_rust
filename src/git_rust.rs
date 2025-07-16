@@ -138,6 +138,10 @@ impl RepoRust {
     }
 
     pub fn ls_files(_args: &ArgMatches) -> std::io::Result<()> {
+        let entries = Index::ls_index()?;
+        for (path, _entry) in entries.iter() {
+            println!("{path}");
+        }
         Ok(())
     }
 
