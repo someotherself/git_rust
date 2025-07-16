@@ -24,9 +24,8 @@ pub struct IndexHeader {
     pub entries: [u8; 4],
 }
 
-impl IndexHeader {
-    // Convert to trait
-    fn from_entries(entries: u32) -> Self {
+impl From<u32> for IndexHeader {
+    fn from(entries: u32) -> Self {
         let sign = [b'D', b'I', b'R', b'C'];
         Self {
             sign,
@@ -34,7 +33,9 @@ impl IndexHeader {
             entries: entries.to_be_bytes(),
         }
     }
+}
 
+impl IndexHeader {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
 
@@ -181,7 +182,7 @@ impl Index {
     }
 
     fn from_entries(entries: BTreeMap<String, IndexEntry>) -> Index {
-        let header = IndexHeader::from_entries(entries.len() as u32);
+        let header = IndexHeader::from(entries.len() as u32);
         Index { header, entries }
     }
 

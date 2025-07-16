@@ -14,7 +14,6 @@ use crate::{
 
 pub const BASE_DIR: &str = ".git_rust";
 
-// ThreadLocal for testing purposes
 pub static REPO: ThreadLocal<Arc<RepoRust>> = ThreadLocal::new();
 
 // Built internally, to hold information about the repo

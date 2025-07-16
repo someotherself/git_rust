@@ -42,7 +42,7 @@ It uses a binary layour (raw bytes) and always big-endian format.
 The index has a header that is 12 bytes, a record of entries (files/blobs) added to the staging area and a checksum (SHA-1) of all the content (header + entries).
 The entries are not a fixed length, but a multiple of 8 bytes:
 - 62 bytes of fixed-size metadata (ctime, mtime, mode, sha1, etc.).
-- Variable-length path (the filename or relative path), which follows the metadata.
+- A null terminated, variable-length path (the filename or relative path), which follows the metadata. 
 - 1–8 bytes of padding to ensure the total size of the entry is a multiple of 8 bytes.
 
 
