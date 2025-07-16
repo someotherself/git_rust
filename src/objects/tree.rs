@@ -29,7 +29,7 @@ impl Tree {
     }
 
     // write-tree TODO
-    pub fn encode_object(args: &ArgMatches) -> std::io::Result<Tree> {
+    pub fn encode_object(args: &ArgMatches) -> std::io::Result<Self> {
         // TODO: Check if blob already exists. Add test for it.
         // let sub_arg = args.get_flag("___");
         let _object = args
@@ -40,8 +40,8 @@ impl Tree {
     }
 
     // ls-tree
-    pub fn decode_object(args: &ArgMatches) -> std::io::Result<Tree> {
-        let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
+    pub fn decode_object(args: &ArgMatches) -> std::io::Result<Self> {
+        let root_path = RepoRust::get_object_folder(&RepoRust::get_root().base_path);
 
         let hash = args
             .get_one::<String>("hash")
@@ -51,12 +51,12 @@ impl Tree {
         let file_path = root_path.join(folder_name).join(file_name);
         let file_content = std::fs::read(file_path)?;
 
-        let bytes_output = Tree::de_compress(file_content)?;
-        let header = Header::from_binary(bytes_output.clone())?;
+        let bytes_output = Self::de_compress(file_content.as_slice())?;
+        let header = Header::from_binary(bytes_output.as_slice())?;
 
-        let entries = Tree::get_tree_entries(bytes_output, &header)?;
+        let entries = Self::get_tree_entries(bytes_output.as_slice(), &header);
 
-        let tree = Tree {
+        let tree = Self {
             header,
             hash,
             entries,
@@ -72,17 +72,14 @@ impl Tree {
         todo!()
     }
 
-    pub fn de_compress(content: Vec<u8>) -> std::io::Result<Vec<u8>> {
+    pub fn de_compress(content: &[u8]) -> std::io::Result<Vec<u8>> {
         let mut buffer = vec![0; 1024];
-        let mut decompressed = ZlibDecoder::new(&content[..]);
+        let mut decompressed = ZlibDecoder::new(content);
         decompressed.read_exact(&mut buffer)?;
         Ok(buffer)
     }
 
-    pub fn get_tree_entries(
-        bytes_output: Vec<u8>,
-        head: &Header,
-    ) -> std::io::Result<Vec<TreeEntry>> {
+    pub fn get_tree_entries(bytes_output: &[u8], head: &Header) -> Vec<TreeEntry> {
         // head.head_length() = length of the head, in order to skip it
         // head.size = size of the content to parse starting after head.head_length()
         //
@@ -95,7 +92,7 @@ impl Tree {
         while i < head.size {
             let mut start = i;
             while bytes_output[i] != b' ' {
-                i += 1
+                i += 1;
             }
             let mode = String::from_utf8(bytes_output[start..i].to_vec()).unwrap();
             let objecttype: ObjectType;
@@ -108,7 +105,7 @@ impl Tree {
             }
             start = i + 1;
             while bytes_output[i] != b'\0' {
-                i += 1
+                i += 1;
             }
             let name = String::from_utf8(bytes_output[start..i].to_vec()).unwrap();
             start = i + 1;
@@ -123,7 +120,7 @@ impl Tree {
             };
             entries.push(tree);
         }
-        Ok(entries)
+        entries
     }
 
     // pub fn write_trees(dir: PathBuf) -> std::io::Result<()> {

@@ -2,7 +2,7 @@ use clap::ArgMatches;
 use std::{
     fs,
     io::{Error, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 use thread_local::ThreadLocal;
@@ -26,7 +26,7 @@ pub struct RepoRust {
 impl RepoRust {
     // Used internaly. No connection to git init
     pub fn new_repo(path: &str) -> std::io::Result<()> {
-        let repo = RepoRust {
+        let repo = Self {
             base_path: path.into(),
         };
 
@@ -54,17 +54,15 @@ impl RepoRust {
     }
 
     // Used by git init when repo already initialized (when testing)
-    pub fn get_root() -> std::io::Result<Arc<RepoRust>> {
+    pub fn get_root() -> Arc<Self> {
         if let Some(repo) = REPO.get() {
-            return Ok(repo.clone());
+            return repo.clone();
         }
 
-        let dir = RepoRust::find_root()
+        let dir = Self::find_root()
             .unwrap_or_else(|_| std::env::current_dir().expect("Failed to read filesystem"));
 
-        Ok(REPO
-            .get_or(|| Arc::new(RepoRust { base_path: dir }))
-            .clone())
+        REPO.get_or(|| Arc::new(Self { base_path: dir })).clone()
     }
 
     // Used by git init to find repo
@@ -82,12 +80,12 @@ impl RepoRust {
         }
     }
 
-    pub fn get_object_folder(root: PathBuf) -> std::io::Result<PathBuf> {
-        Ok(root.join(BASE_DIR).join("objects"))
+    pub fn get_object_folder(root: &Path) -> PathBuf {
+        root.join(BASE_DIR).join("objects")
     }
 
     pub fn init() -> std::io::Result<()> {
-        let root = RepoRust::get_root()?;
+        let root = Self::get_root();
         let head = root.base_path.join(BASE_DIR).join("HEAD");
         if head.try_exists()? {
             return Err(Error::other("Git already initialized!"));
@@ -103,10 +101,7 @@ impl RepoRust {
 
     pub fn cat_file(args: &ArgMatches) -> std::io::Result<()> {
         let _sub_arg = args.get_flag("pretty");
-        let hash = args
-            .get_one::<String>("hash")
-            .expect("Hash is required.")
-            .to_owned();
+        let hash = args.get_one::<String>("hash").expect("Hash is required.");
         // Contents without the header
         // TODO Get the blob and display contents based on object type
         // let blob = Blob::from_hash(hash.clone())?;
@@ -138,7 +133,7 @@ impl RepoRust {
 
     pub fn ls_files(_args: &ArgMatches) -> std::io::Result<()> {
         let entries = Index::ls_index()?;
-        for (path, _entry) in entries.iter() {
+        for (path, _entry) in entries {
             println!("{path}");
         }
         Ok(())

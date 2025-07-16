@@ -136,7 +136,7 @@ fn test_hash_file_in_temp_folder() {
         assert_eq!(git2_hash.id().to_string(), format!("{}", git_rust_hash));
 
         // cat-file the object
-        let git_rust_content = blob::Blob::decode_object(git_rust_hash.hash.clone()).unwrap();
+        let git_rust_content = blob::Blob::decode_object(&git_rust_hash.hash).unwrap();
 
         let oid = repo.find_blob(blob_oid).unwrap();
         let git2_content = oid.content();
@@ -215,7 +215,7 @@ fn test_hash_cat_raw_bytes() {
         let git_rust_hash = blob::Blob::encode_object(&args).unwrap();
 
         // cat-file the object
-        let git_rust_content = blob::Blob::decode_object(git_rust_hash.hash).unwrap();
+        let git_rust_content = blob::Blob::decode_object(&git_rust_hash.hash).unwrap();
 
         assert_eq!(git_rust_content, &[0x00, 0xFF, 0xFE, 0x41, 0x42, 0x00]);
     });
@@ -274,7 +274,6 @@ fn test_git_add_files() {
         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
         git_rust::RepoRust::init().unwrap();
         let index_path = &git_rust::RepoRust::get_root()
-            .unwrap()
             .base_path
             .join(BASE_DIR)
             .join("INDEX");
@@ -318,7 +317,7 @@ fn test_git_add_files() {
 
         // Validate SHA-1 hash
         let file_contents_1 = std::fs::read(&file_path_1).unwrap();
-        let expected_sha1 = Index::sha1_entry(file_contents_1).unwrap();
+        let expected_sha1 = Index::sha1_entry(file_contents_1.as_slice());
         assert_eq!(expected_sha1, entry.sha1);
 
         // Compare SHA-1 with real git
@@ -369,7 +368,7 @@ fn test_git_add_files() {
 
         // Validate SHA-1 hash
         let file_contents_2 = std::fs::read(&file_path_2).unwrap();
-        let expected_sha1_2 = Index::sha1_entry(file_contents_2).unwrap();
+        let expected_sha1_2 = Index::sha1_entry(file_contents_2.as_slice());
         assert_eq!(expected_sha1_2, entry_2.sha1);
 
         // Compare SHA-1 with real git

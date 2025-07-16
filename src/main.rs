@@ -65,8 +65,7 @@ fn main() -> std::io::Result<()> {
         Some(("add", args)) => RepoRust::add(args)?,
         Some(("ls-files", args)) => RepoRust::ls_files(args)?,
         Some(("write-tree", args)) => RepoRust::write_tree(args)?,
-        Some((_, _)) => {}
-        None => {}
+        Some((_, _)) | None => {}
     }
     Ok(())
 }

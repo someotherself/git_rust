@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{fmt::Display, path::PathBuf};
+use std::fmt::Display;
 
 pub mod blob;
 pub mod commit;
@@ -29,34 +29,32 @@ impl Header {
         object.len() + content_size.len() + 1
     }
 
-    pub fn from_binary(file: Vec<u8>) -> std::io::Result<Header> {
+    pub fn from_binary(file: &[u8]) -> std::io::Result<Self> {
         let header = file
             .iter()
             .copied()
             .take_while(|&b| b != b'\0')
             .collect::<Vec<u8>>();
         let string = String::from_utf8(header).unwrap();
-        let vec: Vec<&str> = string.split(" ").collect();
-        let size: usize = vec[1].parse().unwrap();
-        Ok(Header {
+        let vec: Vec<&str> = string.split(' ').collect();
+        let size: usize = vec
+            .get(1)
+            .ok_or_else(|| std::io::Error::other("Missing size field"))?
+            .parse()
+            .map_err(|_| std::io::Error::other("Missing size field"))?;
+        Ok(Self {
             object: ObjectType::Tree,
             size,
         })
     }
 }
 
-impl ObjectType {
-    fn get_mode(_path: PathBuf) -> std::io::Result<()> {
-        todo!()
-    }
-}
-
 impl Display for ObjectType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ObjectType::Blob => f.write_str("blob"),
-            ObjectType::Tree => f.write_str("tree"),
-            ObjectType::Commit => f.write_str("commit"),
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> core::fmt::Result {
+        match *self {
+            Self::Blob => f.write_str("blob"),
+            Self::Tree => f.write_str("tree"),
+            Self::Commit => f.write_str("commit"),
         }
     }
 }

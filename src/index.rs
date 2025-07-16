@@ -46,14 +46,14 @@ impl IndexHeader {
         buf
     }
 
-    fn header(file: &[u8]) -> std::io::Result<IndexHeader> {
+    fn header(file: &[u8]) -> std::io::Result<Self> {
         if file.len() < 12 {
             return Err(std::io::Error::other("Invalid header."));
         }
         let sign: [u8; 4] = file[0..4].try_into().unwrap();
         let version: [u8; 4] = file[4..8].try_into().unwrap();
         let entries: [u8; 4] = file[8..12].try_into().unwrap();
-        let header = IndexHeader {
+        let header = Self {
             sign,
             version,
             entries,
@@ -155,7 +155,7 @@ impl IndexEntry {
         }
 
         Ok((
-            IndexEntry {
+            Self {
                 ctime,
                 ctime_nanos,
                 mtime,
@@ -175,15 +175,14 @@ impl IndexEntry {
     }
 }
 
-#[allow(dead_code)]
 impl Index {
     fn header(&self) -> &IndexHeader {
         &self.header
     }
 
-    fn from_entries(entries: BTreeMap<String, IndexEntry>) -> Index {
+    fn from_entries(entries: BTreeMap<String, IndexEntry>) -> Self {
         let header = IndexHeader::from(entries.len() as u32);
-        Index { header, entries }
+        Self { header, entries }
     }
 
     // TODO: Compare metadata when file already exists in index
@@ -203,26 +202,31 @@ impl Index {
     //      B. Path does not exist in index              -> Add to index. Persist change
     //      C. Path exists and SHA1 is same              -> Move on
     pub fn build_index(path: String) -> std::io::Result<()> {
-        let root = &RepoRust::get_root()?.base_path;
-        let mut entries: BTreeMap<String, IndexEntry> = BTreeMap::new();
-        if root.join(BASE_DIR).join("INDEX").exists() {
-            entries = Index::read_index()?.entries;
-        }
+        let root = &RepoRust::get_root().base_path;
+        // let mut entries: BTreeMap<String, IndexEntry> = BTreeMap::new();
+        // if root.join(BASE_DIR).join("INDEX").exists() {
+        //     entries = Self::read_index()?.entries;
+        // }
+        let mut entries = if root.join(BASE_DIR).join("INDEX").exists() {
+            Self::read_index()?.entries
+        } else {
+            BTreeMap::new()
+        };
         let path = PathBuf::from(path);
-        let mut stack = vec![path.clone()];
+        let mut stack = vec![path];
         while let Some(current_path) = stack.pop() {
             if current_path.is_file() {
                 // 1. Get entry - index the file
-                let entry = Index::index_entry_from_file(current_path.clone())?;
+                let entry = Self::index_entry_from_file(&current_path)?;
                 let key: String = current_path.to_string_lossy().into();
 
                 // 2. Check if blob already exists on disk
-                let blob_exists = Blob::blob_exists(entry.sha1)?;
+                let blob_exists = Blob::blob_exists(entry.sha1);
                 if !blob_exists {
                     // If no - Create the file
                     let file = std::fs::read(current_path)?;
-                    let blob = Blob::blob_with_sha1(file.clone())?;
-                    blob.write_object_to_file(file)?;
+                    let blob = Blob::blob_with_sha1(file.as_slice());
+                    blob.write_object_to_file(file.as_slice())?;
                 } // If yes, move on
 
                 // 3. Check if blob exists in index
@@ -251,20 +255,20 @@ impl Index {
         }
 
         // Create and update the index
-        let index = Index::from_entries(entries);
+        let index = Self::from_entries(entries);
         index.write_index_to_file()?;
         Ok(())
     }
 
-    pub fn sha1_entry(file: Vec<u8>) -> std::io::Result<[u8; 20]> {
+    pub fn sha1_entry(file: &[u8]) -> [u8; 20] {
         let mut hasher = Sha1::new();
         hasher.update(format!("blob {}\0", file.len()).as_bytes());
-        hasher.update(&file);
+        hasher.update(file);
         let result = hasher.finalize();
-        Ok(result.into())
+        result.into()
     }
 
-    pub fn index_entry_from_file(path: PathBuf) -> std::io::Result<IndexEntry> {
+    pub fn index_entry_from_file(path: &PathBuf) -> std::io::Result<IndexEntry> {
         let metadata = path.metadata()?;
         let ctime = metadata.ctime() as u32;
         let ctime_nanos = metadata.ctime_nsec() as u32;
@@ -277,8 +281,8 @@ impl Index {
         let gid = metadata.gid();
         let file_size = metadata.size() as u32;
 
-        let file = std::fs::read(&path)?;
-        let sha1 = Index::sha1_entry(file)?;
+        let file = std::fs::read(path)?;
+        let sha1 = Self::sha1_entry(file.as_slice());
 
         let path_str = path.to_string_lossy();
         let name_len = path_str.len();
@@ -288,10 +292,11 @@ impl Index {
         let name_len_field = if name_len >= 0xFFF {
             0xFFF
         } else {
-            name_len as u16
+            u16::try_from(name_len)
+                .map_err(|_| std::io::Error::other("Could not index file name"))?
         };
-        let flags: u16 = ((assume_valid as u16) << 15)
-            | ((extended as u16) << 14)
+        let flags: u16 = (u16::from(assume_valid) << 15)
+            | (u16::from(extended) << 14)
             | ((stage as u16) << 12)
             | name_len_field;
 
@@ -319,12 +324,12 @@ impl Index {
 
     fn write_index_to_file(&self) -> std::io::Result<()> {
         let mut buffer = Vec::new();
-        let index_path = &RepoRust::get_root()?.base_path.join(BASE_DIR).join("INDEX");
+        let index_path = &RepoRust::get_root().base_path.join(BASE_DIR).join("INDEX");
 
         let header = self.header();
         let header_bytes = header.to_bytes();
         buffer.extend_from_slice(&header_bytes);
-        for (_, entry) in self.entries.iter() {
+        for entry in self.entries.values() {
             buffer.extend_from_slice(&entry.to_bytes());
         }
 
@@ -338,8 +343,8 @@ impl Index {
         Ok(())
     }
 
-    pub fn read_index() -> std::io::Result<Index> {
-        let index_path = &RepoRust::get_root()?.base_path.join(BASE_DIR).join("INDEX");
+    pub fn read_index() -> std::io::Result<Self> {
+        let index_path = &RepoRust::get_root().base_path.join(BASE_DIR).join("INDEX");
         let file = std::fs::read(index_path)?;
 
         // Parse header
@@ -355,11 +360,11 @@ impl Index {
             entries.insert(path, entry);
             bytes_read += size;
         }
-        Ok(Index { header, entries })
+        Ok(Self { header, entries })
     }
 
     pub fn ls_index() -> std::io::Result<BTreeMap<String, IndexEntry>> {
-        let index = Index::read_index()?;
+        let index = Self::read_index()?;
         Ok(index.entries)
     }
 }
