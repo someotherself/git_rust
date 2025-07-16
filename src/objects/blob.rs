@@ -89,7 +89,7 @@ impl Blob {
     }
 
     // TODO: Incorrect implementation.
-    pub fn new_from_bytes(bytes: Vec<u8>) -> std::io::Result<Self> {
+    fn new_from_bytes(bytes: Vec<u8>) -> std::io::Result<Self> {
         let null_pos: usize = bytes.iter().position(|&b| b == b'\0').unwrap();
 
         let header_bytes = &bytes[..null_pos];

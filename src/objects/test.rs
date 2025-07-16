@@ -442,9 +442,8 @@ fn test_git_add_folder() {
         git_rust::RepoRust::init().unwrap();
 
         // INDEX the folder
-        let add_args = run_test_matches(vec!["", "add", path_folder_1_str]);
-        git_rust::RepoRust::add(&add_args).unwrap();
-        let _index = Index::read_index().unwrap();
+        let add_args_1 = run_test_matches(vec!["", "add", path_folder_1_str]);
+        git_rust::RepoRust::add(&add_args_1).unwrap();
 
         let read_index = Index::read_index();
         assert!(read_index.is_ok());
@@ -461,5 +460,30 @@ fn test_git_add_folder() {
             );
             assert_eq!(entry.flags & 0x0FFF, 67);
         }
+
+        // Continue adding more files from root
+        let file_path_1 = path.join("test1.txt");
+        let file_path_str_1 = file_path_1.to_str().unwrap();
+        let mut file_1 = std::fs::File::create_new(&file_path_1).unwrap();
+        file_1.write_all(b"this is a test").unwrap();
+
+        let file_path_2 = path.join("test2.txt");
+        let file_path_str_2 = file_path_2.to_str().unwrap();
+        let mut file_2 = std::fs::File::create_new(&file_path_2).unwrap();
+        file_2.write_all(b"this is a test.").unwrap();
+
+        // INDEX the files
+        let add_args_2 = run_test_matches(vec!["", "add", file_path_str_1]);
+        git_rust::RepoRust::add(&add_args_2).unwrap();
+
+        // INDEX the files
+        let add_args_3 = run_test_matches(vec!["", "add", file_path_str_2]);
+        git_rust::RepoRust::add(&add_args_3).unwrap();
+
+        let index = Index::read_index().unwrap();
+
+        assert_eq!(index.header.sign, [b'D', b'I', b'R', b'C']);
+        assert_eq!(index.header.version, 2_u32.to_be_bytes());
+        assert_eq!(index.header.entries, 7_u32.to_be_bytes());
     });
 }

@@ -109,6 +109,7 @@ impl RepoRust {
             .expect("Hash is required.")
             .to_owned();
         // Contents without the header
+        // TODO Get the blob and display contents based on object type
         // let blob = Blob::from_hash(hash.clone())?;
         let contents = Blob::decode_object(hash)?;
         std::io::stdout().write_all(&contents)?;
