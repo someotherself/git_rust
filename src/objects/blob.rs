@@ -11,7 +11,7 @@ use sha1::{Digest, Sha1};
 
 use crate::{
     git_rust::RepoRust,
-    objects::{GitObject, Header, ObjectType, blob},
+    objects::{Header, ObjectType, blob},
 };
 
 #[derive(Debug)]
@@ -29,6 +29,10 @@ impl PartialEq for Blob {
 }
 
 impl Blob {
+    fn header(&self) -> &Header {
+        &self.header
+    }
+
     pub fn get_folder(&self) -> &str {
         &self.folder
     }
@@ -37,12 +41,63 @@ impl Blob {
         &self.file
     }
 
+    // cat-file command
+    pub fn decode_object(args: &ArgMatches) -> std::io::Result<Blob> {
+        let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
+        let _sub_arg = args.get_flag("pretty");
+        let hash = args
+            .get_one::<String>("hash")
+            .expect("Hash is required.")
+            .to_owned();
+
+        let (folder_name, file_name) = hash.split_at(2);
+        let file_path = root_path.join(folder_name).join(file_name);
+        let file = std::fs::read(file_path)?;
+        let bytes_output = Blob::de_compress(file)?;
+        let blob = Blob::new_from_bytes(bytes_output)?;
+        Ok(blob)
+    }
+
+    // hash-object command
+    pub fn encode_object(args: &ArgMatches) -> std::io::Result<Blob> {
+        // TODO: Check if blob already exists. Add test for it.
+        let sub_arg = args.get_flag("write");
+        let object = args
+            .get_one::<String>("file")
+            .expect("File is required.")
+            .to_owned();
+        let file = std::fs::read(PathBuf::from(object))?;
+        let blob = blob::Blob::blob_with_sha1(file.clone())?;
+        if sub_arg {
+            blob.write_object_to_file(file)?;
+        }
+        Ok(blob)
+    }
+
+    pub fn write_object_to_file(&self, file: Vec<u8>) -> std::io::Result<()> {
+        let objects_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
+        let folder_path = objects_path.join(&self.folder);
+        let file_path = folder_path.join(&self.file);
+        if !folder_path.exists() {
+            std::fs::create_dir(folder_path)?;
+        }
+        let new_blob = std::fs::File::create(file_path)?;
+        let mut enc =
+            ZlibEncoder::new_with_compress(new_blob, Compress::new(Compression::best(), true));
+        let header = format!("blob {}\0", file.len());
+        let full_blob = [header.as_bytes(), &file[..]].concat();
+
+        enc.write_all(&full_blob)?;
+        Ok(())
+    }
+
     fn new_from_bytes(bytes: Vec<u8>) -> std::io::Result<Self> {
         let null_pos = bytes.iter().position(|&b| b == b'\0').unwrap();
 
         let header_bytes = &bytes[..null_pos];
         let content_bytes = &bytes[null_pos + 1..];
 
+        // TODO This is not the hash, it's the content of the file
         let hash = std::str::from_utf8(content_bytes).unwrap().to_owned();
         let header = Header::from_binary(header_bytes.to_vec())?;
         let (folder, file) = hash.split_at(2).to_owned();
@@ -88,65 +143,6 @@ impl Blob {
         let hex_hash = hex::encode(hash);
         let (folder_name, file_name) = hex_hash.split_at(2);
         Ok(obj_path.join(folder_name).join(file_name).exists())
-    }
-}
-
-impl GitObject for Blob {
-    const TYPE: ObjectType = ObjectType::Blob;
-    type Output = Blob;
-
-    fn header(&self) -> &Header {
-        &self.header
-    }
-
-    fn write_object_to_file(&self, file: Vec<u8>) -> std::io::Result<()> {
-        let objects_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
-        let folder_path = objects_path.join(&self.folder);
-        let file_path = folder_path.join(&self.file);
-        if !folder_path.exists() {
-            std::fs::create_dir(folder_path)?;
-        }
-        let new_blob = std::fs::File::create(file_path)?;
-        let mut enc =
-            ZlibEncoder::new_with_compress(new_blob, Compress::new(Compression::best(), true));
-        let header = format!("blob {}\0", file.len());
-        let full_blob = [header.as_bytes(), &file[..]].concat();
-
-        enc.write_all(&full_blob)?;
-        Ok(())
-    }
-
-    // hash-object command
-    fn encode_object(args: &ArgMatches) -> std::io::Result<Blob> {
-        // TODO: Check if blob already exists. Add test for it.
-        let sub_arg = args.get_flag("write");
-        let object = args
-            .get_one::<String>("file")
-            .expect("File is required.")
-            .to_owned();
-        let file = std::fs::read(PathBuf::from(object))?;
-        let blob = blob::Blob::blob_with_sha1(file.clone())?;
-        if sub_arg {
-            blob.write_object_to_file(file)?;
-        }
-        Ok(blob)
-    }
-
-    // cat-file command
-    fn decode_object(args: &ArgMatches) -> std::io::Result<Blob> {
-        let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
-        let _sub_arg = args.get_flag("pretty");
-        let hash = args
-            .get_one::<String>("hash")
-            .expect("Hash is required.")
-            .to_owned();
-
-        let (folder_name, file_name) = hash.split_at(2);
-        let file_path = root_path.join(folder_name).join(file_name);
-        let file = std::fs::read(file_path)?;
-        let bytes_output = Blob::de_compress(file)?;
-        let blob = Blob::new_from_bytes(bytes_output)?;
-        Ok(blob)
     }
 }
 

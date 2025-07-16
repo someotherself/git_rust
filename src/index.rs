@@ -7,7 +7,7 @@ use sha1::{Digest, Sha1};
 
 use crate::{
     git_rust::{BASE_DIR, RepoRust},
-    objects::{GitObject, blob::Blob},
+    objects::blob::Blob,
 };
 
 #[derive(Default)]

@@ -2,8 +2,6 @@
 
 use std::{fmt::Display, path::PathBuf};
 
-use clap::ArgMatches;
-
 pub mod blob;
 pub mod commit;
 pub mod tree;
@@ -51,20 +49,6 @@ impl ObjectType {
     fn get_mode(_path: PathBuf) -> std::io::Result<()> {
         todo!()
     }
-}
-
-pub trait GitObject: Display {
-    const TYPE: ObjectType;
-
-    type Output: GitObject;
-
-    fn header(&self) -> &Header;
-
-    fn write_object_to_file(&self, file: Vec<u8>) -> std::io::Result<()>;
-
-    fn encode_object(args: &ArgMatches) -> std::io::Result<Self::Output>;
-
-    fn decode_object(args: &ArgMatches) -> std::io::Result<Self::Output>;
 }
 
 impl Display for ObjectType {

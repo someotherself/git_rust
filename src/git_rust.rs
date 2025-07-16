@@ -4,7 +4,7 @@ use thread_local::ThreadLocal;
 
 use crate::{
     index::Index,
-    objects::{GitObject, blob::Blob, tree::Tree},
+    objects::{blob::Blob, tree::Tree},
 };
 
 pub const BASE_DIR: &str = ".git_rust";

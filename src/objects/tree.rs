@@ -7,7 +7,7 @@ use hex::ToHex;
 
 use crate::{
     git_rust::RepoRust,
-    objects::{GitObject, Header, ObjectType},
+    objects::{Header, ObjectType},
 };
 
 pub struct TreeEntry {
@@ -24,6 +24,50 @@ pub struct Tree {
 }
 
 impl Tree {
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+
+    // write-tree TODO
+    pub fn encode_object(args: &ArgMatches) -> std::io::Result<Tree> {
+        // TODO: Check if blob already exists. Add test for it.
+        // let sub_arg = args.get_flag("___");
+        let _object = args
+            .get_one::<String>("file")
+            .expect("File is required.")
+            .to_owned();
+        todo!()
+    }
+
+    // ls-tree
+    pub fn decode_object(args: &ArgMatches) -> std::io::Result<Tree> {
+        let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
+
+        let hash = args
+            .get_one::<String>("hash")
+            .expect("Object is required.")
+            .to_owned();
+        let (folder_name, file_name) = hash.split_at(2);
+        let file_path = root_path.join(folder_name).join(file_name);
+        let file_content = std::fs::read(file_path)?;
+
+        let bytes_output = Tree::de_compress(file_content)?;
+        let header = Header::from_binary(bytes_output.clone())?;
+
+        let entries = Tree::get_tree_entries(bytes_output, &header)?;
+
+        let tree = Tree {
+            header,
+            hash,
+            entries,
+        };
+        Ok(tree)
+    }
+
+    fn write_object_to_file(&self, _file: Vec<u8>) -> std::io::Result<()> {
+        todo!()
+    }
+
     pub fn from_bytes(_file: Vec<u8>) -> std::io::Result<Self> {
         todo!()
     }
@@ -102,55 +146,6 @@ impl Tree {
     //     // Return SHA-1 of the tree object
     //     todo!()
     // }
-}
-
-impl GitObject for Tree {
-    const TYPE: ObjectType = ObjectType::Tree;
-    type Output = Tree;
-
-    fn header(&self) -> &Header {
-        &self.header
-    }
-
-    // write-tree TODO
-    fn encode_object(args: &ArgMatches) -> std::io::Result<Tree> {
-        // TODO: Check if blob already exists. Add test for it.
-        // let sub_arg = args.get_flag("___");
-        let _object = args
-            .get_one::<String>("file")
-            .expect("File is required.")
-            .to_owned();
-        todo!()
-    }
-
-    // ls-tree
-    fn decode_object(args: &ArgMatches) -> std::io::Result<Tree> {
-        let root_path = RepoRust::get_object_folder(RepoRust::get_root()?.base_path.clone())?;
-
-        let hash = args
-            .get_one::<String>("hash")
-            .expect("Object is required.")
-            .to_owned();
-        let (folder_name, file_name) = hash.split_at(2);
-        let file_path = root_path.join(folder_name).join(file_name);
-        let file_content = std::fs::read(file_path)?;
-
-        let bytes_output = Tree::de_compress(file_content)?;
-        let header = Header::from_binary(bytes_output.clone())?;
-
-        let entries = Tree::get_tree_entries(bytes_output, &header)?;
-
-        let tree = Tree {
-            header,
-            hash,
-            entries,
-        };
-        Ok(tree)
-    }
-
-    fn write_object_to_file(&self, _file: Vec<u8>) -> std::io::Result<()> {
-        todo!()
-    }
 }
 
 impl Display for TreeEntry {

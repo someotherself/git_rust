@@ -3,7 +3,7 @@ use std::{io::Write, os::unix::fs::MetadataExt, path::PathBuf};
 use crate::{
     git_rust::{self, BASE_DIR},
     index::Index,
-    objects::{GitObject, blob},
+    objects::blob,
     test_common::{run_test, run_test_matches},
 };
 
@@ -39,6 +39,8 @@ fn test_init_repo_struct_in_temp_folder() {
     });
 }
 
+// Only works if cargo run init is not run either
+#[ignore]
 #[test]
 fn test_hash_file_without_init() {
     run_test(|setup| {
@@ -53,10 +55,10 @@ fn test_hash_file_without_init() {
 
         let args_1 = run_test_matches(vec!["", "hash-object", "-w", &file_path_str]);
         let result_1 = blob::Blob::encode_object(&args_1);
-        // SHOULD BE ERROR TODO
-        assert!(result_1.is_ok());
-        // -- Without '-w' should still work
+        // SHOULD BE ERROR
+        assert!(result_1.is_err());
 
+        // -- Without '-w' should still work
         let args_2 = run_test_matches(vec!["", "hash-object", &file_path_str]);
         let result_2 = blob::Blob::encode_object(&args_2);
         // Should be ok
@@ -93,7 +95,6 @@ fn test_hash_file_without_w() {
         // Make sure the objects folder is empty
         let mut entries = path.join(BASE_DIR).join("objects").read_dir().unwrap();
         assert!(entries.next().is_none());
-        dbg!(path.join(BASE_DIR).join("objects"));
     });
 }
 
@@ -194,18 +195,33 @@ fn test_hash_file_in_temp_folder() {
     });
 }
 
-#[test]
-fn test_hash_cat_raw_bytes() {
-    run_test(|setup| {
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
-        // Create file to hash
-        let file_path_1 = path.join("test1.txt");
-        let file_path_str_1 = file_path_1.to_str().unwrap();
-        let mut file_1 = std::fs::File::create(&file_path_1).unwrap();
-        file_1.write_all(b"this is a test").unwrap();
-    });
-}
+// TODO Must fix cat-file to show raw bytes
+// #[test]
+// fn test_hash_cat_raw_bytes() {
+//     run_test(|setup| {
+//         let setup = setup.lock().unwrap().take().unwrap();
+//         let path = &setup.dir;
+//         // Create file to hash
+//         let file_path_1 = path.join("test1.txt");
+//         let file_path_str_1 = file_path_1.to_str().unwrap();
+//         let mut file_1 = std::fs::File::create(&file_path_1).unwrap();
+//         file_1.write_all(&[0x00, 0xFF, 0xFE, 0x41, 0x42, 0x00]).unwrap();
+
+//         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+//         git_rust::RepoRust::init().unwrap();
+//         let args = run_test_matches(vec!["", "hash-object", "-w", &file_path_str_1]);
+
+//         let git_rust_hash = blob::Blob::encode_object(&args).unwrap();
+
+//         // cat-file the object
+//         let cat_args = run_test_matches(vec!["", "cat-file", "-p", &format!("{}", git_rust_hash)]);
+//         let git_rust_content = blob::Blob::decode_object(&cat_args).unwrap();
+
+//         let a = format!("{}", git_rust_content);
+//         dbg!(a);
+//         // assert_eq!(, &[0x00, 0xFF, 0xFE, 0x41, 0x42, 0x00]);
+//     });
+// }
 
 // Can cause damage if other tests fail
 #[test]
