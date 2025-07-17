@@ -47,7 +47,7 @@ impl Blob {
         let (folder_name, file_name) = hash.split_at(2);
         let file_path = root_path.join(folder_name).join(file_name);
         let file = std::fs::read(file_path)?;
-        let bytes_output = Self::de_compress(file.as_slice())?;
+        let bytes_output = Self::de_compress(&file)?;
 
         let null_pos = bytes_output.iter().position(|&b| b == b'\0').unwrap();
         let content_bytes = bytes_output[null_pos + 1..].to_vec();
@@ -64,9 +64,9 @@ impl Blob {
             .expect("File is required.")
             .to_owned();
         let file = std::fs::read(PathBuf::from(object))?;
-        let blob = Self::blob_with_sha1(file.as_slice());
+        let blob = Self::blob_with_sha1(&file);
         if sub_arg {
-            blob.write_object_to_file(file.as_slice())?;
+            blob.write_object_to_file(&file)?;
         }
         Ok(blob)
     }

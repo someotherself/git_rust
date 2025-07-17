@@ -194,7 +194,6 @@ fn test_hash_file_in_temp_folder() {
     });
 }
 
-// TODO Must fix cat-file to shw raw bytes
 #[test]
 fn test_hash_cat_raw_bytes() {
     run_test(|setup| {
@@ -317,7 +316,7 @@ fn test_git_add_files() {
 
         // Validate SHA-1 hash
         let file_contents_1 = std::fs::read(&file_path_1).unwrap();
-        let expected_sha1 = Index::sha1_entry(file_contents_1.as_slice());
+        let expected_sha1 = Index::sha1_entry(&file_contents_1);
         assert_eq!(expected_sha1, entry.sha1);
 
         // Compare SHA-1 with real git
@@ -368,7 +367,7 @@ fn test_git_add_files() {
 
         // Validate SHA-1 hash
         let file_contents_2 = std::fs::read(&file_path_2).unwrap();
-        let expected_sha1_2 = Index::sha1_entry(file_contents_2.as_slice());
+        let expected_sha1_2 = Index::sha1_entry(&file_contents_2);
         assert_eq!(expected_sha1_2, entry_2.sha1);
 
         // Compare SHA-1 with real git
@@ -423,9 +422,9 @@ fn test_git_add_same_file_twice() {
 fn test_git_add_folder() {
     run_test(|setup| {
         // Get test dir
-        let mut input = setup.lock().unwrap();
-        let setup = input.take().unwrap();
+        let setup = setup.lock().unwrap().take().unwrap();
         let path = &setup.dir;
+        // Create file to hash
         let path_folder_1 = path.join("folder_1");
         let path_folder_1_str = path_folder_1.to_str().unwrap();
         std::fs::create_dir_all(&path_folder_1).unwrap();

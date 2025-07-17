@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io::Read;
 
@@ -5,6 +6,7 @@ use clap::ArgMatches;
 use flate2::bufread::ZlibDecoder;
 use hex::ToHex;
 
+use crate::index::IndexEntry;
 use crate::{
     git_rust::RepoRust,
     objects::{Header, ObjectType},
@@ -51,10 +53,10 @@ impl Tree {
         let file_path = root_path.join(folder_name).join(file_name);
         let file_content = std::fs::read(file_path)?;
 
-        let bytes_output = Self::de_compress(file_content.as_slice())?;
-        let header = Header::from_binary(bytes_output.as_slice())?;
+        let bytes_output = Self::de_compress(&file_content)?;
+        let header = Header::from_binary(&bytes_output)?;
 
-        let entries = Self::get_tree_entries(bytes_output.as_slice(), &header);
+        let entries = Self::get_tree_entries(&bytes_output, &header);
 
         let tree = Self {
             header,
@@ -123,26 +125,9 @@ impl Tree {
         entries
     }
 
-    // pub fn write_trees(dir: PathBuf) -> std::io::Result<()> {
-    //     // Initialize tree object
-    //     for node in dir.read_dir()? {
-    //         let node = node?;
-
-    //         match node.file_type()? {
-    //             n if n.is_dir() => {
-    //                 Tree::write_trees(node.path())?;
-    //             }
-    //             n if n.is_file() => {
-    //                 // Write blob
-    //                 // return SHA-1
-    //             }
-    //             _ => continue,
-    //         }
-    //     }
-    //     // Write the contents of the tree object
-    //     // Return SHA-1 of the tree object
-    //     todo!()
-    // }
+    pub fn write_trees_from_index(_entries: BTreeMap<String, IndexEntry>) -> std::io::Result<()> {
+        todo!()
+    }
 }
 
 impl Display for TreeEntry {

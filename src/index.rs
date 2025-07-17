@@ -62,7 +62,7 @@ impl IndexHeader {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IndexEntry {
     pub ctime: u32,
     pub ctime_nanos: u32,
@@ -225,11 +225,11 @@ impl Index {
                 if !blob_exists {
                     // If no - Create the file
                     let file = std::fs::read(current_path)?;
-                    let blob = Blob::blob_with_sha1(file.as_slice());
-                    blob.write_object_to_file(file.as_slice())?;
+                    let blob = Blob::blob_with_sha1(&file);
+                    blob.write_object_to_file(&file)?;
                 } // If yes, move on
 
-                // 3. Check if blob exists in index
+                // 3. Check if blob exists in index TODO: Compare metadata
                 match entries.get(&key) {
                     // A.Path does not exist in index -> Add to index
                     None => {
@@ -282,7 +282,7 @@ impl Index {
         let file_size = metadata.size() as u32;
 
         let file = std::fs::read(path)?;
-        let sha1 = Self::sha1_entry(file.as_slice());
+        let sha1 = Self::sha1_entry(&file);
 
         let path_str = path.to_string_lossy();
         let name_len = path_str.len();
