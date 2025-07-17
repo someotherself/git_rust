@@ -3,7 +3,7 @@ use std::{io::Write, os::unix::fs::MetadataExt, path::PathBuf};
 use crate::{
     git_rust::{self, BASE_DIR},
     index::Index,
-    objects::blob,
+    objects::{blob, tree::Tree},
     test_common::{run_test, run_test_matches},
 };
 
@@ -275,7 +275,7 @@ fn test_git_add_files() {
         let index_path = &git_rust::RepoRust::get_root()
             .base_path
             .join(BASE_DIR)
-            .join("INDEX");
+            .join("index");
 
         // INDEX one file
         let add_args = run_test_matches(vec!["", "add", &format!("{}", file_path_str_1)]);
@@ -418,6 +418,7 @@ fn test_git_add_same_file_twice() {
     });
 }
 
+// TODO: Check what happend when calling add on an empty root or folder
 #[test]
 fn test_git_add_folder() {
     run_test(|setup| {
@@ -483,5 +484,44 @@ fn test_git_add_folder() {
         assert_eq!(index.header.sign, [b'D', b'I', b'R', b'C']);
         assert_eq!(index.header.version, 2_u32.to_be_bytes());
         assert_eq!(index.header.entries, 7_u32.to_be_bytes());
+    });
+}
+
+#[test]
+fn test_git_write_trees() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap();
+        let path = &setup.dir;
+        // Create file to hash
+        let file_path_1 = path.join("test1.txt");
+        let file_path_str_1 = file_path_1.to_str().unwrap();
+        let mut file_1 = std::fs::File::create(&file_path_1).unwrap();
+        file_1.write_all(b"this is test 1").unwrap();
+
+        let file_path_2 = path.join("test2.txt");
+        let file_path_str_2 = file_path_2.to_str().unwrap();
+        let mut file_2 = std::fs::File::create(&file_path_2).unwrap();
+        file_2.write_all(b"this is test 2").unwrap();
+
+        let file_path_3 = path.join("test3.txt");
+        let file_path_str_3 = file_path_3.to_str().unwrap();
+        let mut file_3 = std::fs::File::create(&file_path_3).unwrap();
+        file_3.write_all(b"this is test 3").unwrap();
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        // INDEX the files
+        let add_args_1 = run_test_matches(vec!["", "add", file_path_str_1]);
+        let add_args_2 = run_test_matches(vec!["", "add", file_path_str_2]);
+        let add_args_3 = run_test_matches(vec!["", "add", file_path_str_3]);
+        git_rust::RepoRust::add(&add_args_1).unwrap();
+        git_rust::RepoRust::add(&add_args_2).unwrap();
+        git_rust::RepoRust::add(&add_args_3).unwrap();
+
+        let index = Index::read_index().unwrap();
+
+        Tree::write_trees_from_index(index.entries).unwrap();
     });
 }

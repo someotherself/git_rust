@@ -204,10 +204,10 @@ impl Index {
     pub fn build_index(path: String) -> std::io::Result<()> {
         let root = &RepoRust::get_root().base_path;
         // let mut entries: BTreeMap<String, IndexEntry> = BTreeMap::new();
-        // if root.join(BASE_DIR).join("INDEX").exists() {
+        // if root.join(BASE_DIR).join("index").exists() {
         //     entries = Self::read_index()?.entries;
         // }
-        let mut entries = if root.join(BASE_DIR).join("INDEX").exists() {
+        let mut entries = if root.join(BASE_DIR).join("index").exists() {
             Self::read_index()?.entries
         } else {
             BTreeMap::new()
@@ -253,7 +253,6 @@ impl Index {
                 }
             }
         }
-
         // Create and update the index
         let index = Self::from_entries(entries);
         index.write_index_to_file()?;
@@ -324,7 +323,7 @@ impl Index {
 
     fn write_index_to_file(&self) -> std::io::Result<()> {
         let mut buffer = Vec::new();
-        let index_path = &RepoRust::get_root().base_path.join(BASE_DIR).join("INDEX");
+        let index_path = &RepoRust::get_root().base_path.join(BASE_DIR).join("index");
 
         let header = self.header();
         let header_bytes = header.to_bytes();
@@ -344,7 +343,7 @@ impl Index {
     }
 
     pub fn read_index() -> std::io::Result<Self> {
-        let index_path = &RepoRust::get_root().base_path.join(BASE_DIR).join("INDEX");
+        let index_path = &RepoRust::get_root().base_path.join(BASE_DIR).join("index");
         let file = std::fs::read(index_path)?;
 
         // Parse header
@@ -365,6 +364,7 @@ impl Index {
 
     pub fn ls_index() -> std::io::Result<BTreeMap<String, IndexEntry>> {
         let index = Self::read_index()?;
+        println!("{:?}", index.header.entries);
         Ok(index.entries)
     }
 }

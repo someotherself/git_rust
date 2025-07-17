@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 
 use clap::ArgMatches;
 use flate2::bufread::ZlibDecoder;
@@ -125,7 +126,37 @@ impl Tree {
         entries
     }
 
-    pub fn write_trees_from_index(_entries: BTreeMap<String, IndexEntry>) -> std::io::Result<()> {
+    // Flatten the list of paths:
+    // HashMap<"path_without_file", "file">
+    // Go through each entry and recurse the path
+    // Create trees and sha1 each
+    #[allow(unused_variables, unused_mut)]
+    pub fn write_trees_from_index(entries: BTreeMap<String, IndexEntry>) -> std::io::Result<()> {
+        let mut flat_entries: BTreeMap<PathBuf, Vec<PathBuf>> = BTreeMap::new();
+
+        for (path, entry) in entries {
+            let path = PathBuf::from(path);
+            // Paths such as "/" or "." should not be possible
+            let file_name = path.file_name().unwrap().to_owned();
+            let parent_path = path
+                .parent()
+                .filter(|p| *p != Path::new(""))
+                .unwrap_or(Path::new("root"));
+            flat_entries
+                .entry(PathBuf::from(parent_path))
+                .or_default()
+                .push(PathBuf::from(file_name));
+        }
+        Ok(())
+    }
+
+    #[allow(unused_variables, unused_mut)]
+    fn build_trees(entries: BTreeMap<PathBuf, Vec<PathBuf>>) {
+        for (path, children) in entries {
+            // Initiate a tree for the immediate parent
+            // Add children entries into the imediate parent
+            // Initiate trees for higher parents (if any)
+        }
         todo!()
     }
 }

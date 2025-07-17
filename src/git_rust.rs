@@ -140,6 +140,8 @@ impl RepoRust {
     }
 
     pub fn write_tree(_args: &ArgMatches) -> std::io::Result<()> {
+        let index = Index::read_index()?;
+        Tree::write_trees_from_index(index.entries)?;
         Ok(())
     }
 }
