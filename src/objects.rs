@@ -47,6 +47,13 @@ impl Header {
             size,
         })
     }
+
+    pub fn from_tree_entries(entries: usize) -> Self {
+        Self {
+            object: ObjectType::Tree,
+            size: entries,
+        }
+    }
 }
 
 impl Display for ObjectType {
