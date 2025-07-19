@@ -7,6 +7,7 @@ pub static SETUP_RESULT: ThreadLocal<Mutex<Option<TestSetup>>> = ThreadLocal::ne
 
 pub struct TestDir {
     root: TempDir,
+    pub test_dir: String,
 }
 
 #[allow(dead_code)]
@@ -22,7 +23,16 @@ impl TestDir {
             .rand_bytes(4)
             .tempdir_in(cwd)
             .expect("Failed to create test dir");
-        TestDir { root }
+        let temp_dir = root
+            .path()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        TestDir {
+            root,
+            test_dir: temp_dir,
+        }
     }
 
     pub fn path(&self) -> &Path {

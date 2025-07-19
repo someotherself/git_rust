@@ -491,8 +491,8 @@ fn test_git_add_folder() {
 fn test_git_write_trees() {
     run_test(|setup| {
         // Get test dir
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
         // Create file to hash
         let file_path_1 = path.join("test1.txt");
         let file_path_str_1 = file_path_1.to_str().unwrap();
@@ -522,6 +522,7 @@ fn test_git_write_trees() {
 
         let index = Index::read_index().unwrap();
 
-        Tree::write_trees_from_index(index.entries).unwrap();
+        let flat_entries = Tree::write_trees_from_index(index.entries).unwrap();
+        Tree::build_trees(flat_entries).unwrap();
     });
 }

@@ -3,28 +3,28 @@ use std::fmt::Display;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use clap::ArgMatches;
+use clap::{ArgMatches, crate_name};
 use flate2::bufread::ZlibDecoder;
 use hex::ToHex;
 use sha1::{Digest, Sha1};
 
-use crate::index::IndexEntry;
+use crate::index::{Index, IndexEntry};
 use crate::{
     git_rust::RepoRust,
     objects::{Header, ObjectType},
 };
 
 pub struct TreeEntry {
-    pub(crate) mode: String,
-    pub(crate) object_type: ObjectType,
-    pub(crate) name: String,
-    pub(crate) hash: [u8; 20],
+    pub mode: String,
+    pub object_type: ObjectType,
+    pub name: String,
+    pub hash: [u8; 20],
 }
 
 pub struct Tree {
-    pub(crate) header: Header,
-    pub(crate) hash: String,
-    pub(crate) entries: Vec<TreeEntry>,
+    pub header: Header,
+    pub hash: [u8; 20],
+    pub entries: Vec<TreeEntry>,
 }
 
 impl Tree {
@@ -33,25 +33,35 @@ impl Tree {
     }
 
     // write-tree TODO
-    pub fn encode_object(args: &ArgMatches) -> std::io::Result<Self> {
-        // TODO: Check if blob already exists. Add test for it.
-        // let sub_arg = args.get_flag("___");
-        let _object = args
-            .get_one::<String>("file")
-            .expect("File is required.")
-            .to_owned();
-        todo!()
+    pub fn encode_object() -> std::io::Result<()> {
+        let index = Index::read_index()?;
+        let flat_entries = Self::write_trees_from_index(index.entries)?;
+        let _trees = Self::build_trees(flat_entries)?;
+        // Self::write_object_to_file(trees)?; // TODO
+        Ok(())
     }
 
     // ls-tree
     pub fn decode_object(args: &ArgMatches) -> std::io::Result<Self> {
         let root_path = RepoRust::get_object_folder(&RepoRust::get_root().base_path);
 
-        let hash = args
+        let hash_str = args
             .get_one::<String>("hash")
             .expect("Object is required.")
             .to_owned();
-        let (folder_name, file_name) = hash.split_at(2);
+
+        let hash_vec = hex::decode(&hash_str).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Invalid SHA1: {e}"),
+            )
+        })?;
+
+        let hash: [u8; 20] = hash_vec.try_into().map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "SHA1 must be 20 bytes")
+        })?;
+
+        let (folder_name, file_name) = hash_str.split_at(2);
         let file_path = root_path.join(folder_name).join(file_name);
         let file_content = std::fs::read(file_path)?;
 
@@ -68,7 +78,7 @@ impl Tree {
         Ok(tree)
     }
 
-    fn write_object_to_file(&self, _file: Vec<u8>) -> std::io::Result<()> {
+    fn write_object_to_file(_trees: Vec<Tree>) -> std::io::Result<()> {
         todo!()
     }
 
@@ -76,7 +86,6 @@ impl Tree {
     pub fn from_entries(entries: Vec<TreeEntry>) -> std::io::Result<Self> {
         let header = Header::from_tree_entries(entries.len());
         let hash = Self::sha1_tree(&entries);
-        let hash = str::from_utf8(&hash).unwrap().to_string();
         Ok(Self {
             header,
             hash,
@@ -84,7 +93,6 @@ impl Tree {
         })
     }
 
-    // TODO
     // Will prepare the hash for a tree from a Vec of TreeEntries
     // Used before writing to disk
     pub fn sha1_tree(entries: &Vec<TreeEntry>) -> [u8; 20] {
@@ -120,7 +128,7 @@ impl Tree {
     pub fn get_tree_entries(bytes_output: &[u8], head: &Header) -> Vec<TreeEntry> {
         // head.head_length() = length of the head, in order to skip it
         // head.size = size of the content to parse starting after head.head_length()
-        //
+
         // object-> mode+b' '+file name+b'\0'+hash [u8; 20]
         // object-> 100644+b' '+test.txt+b'\0'+63aa9936a393155f43c2b03d42d79b1c83290f41
         // Output-> 100644 blob 63aa9936a393155f43c2b03d42d79b1c83290f41 file.txt
@@ -161,37 +169,48 @@ impl Tree {
         entries
     }
 
-    // Flatten the list of paths:
-    // HashMap<"path_without_file", "file">
-    // Go through each entry and recurse the path
-    // Create trees and sha1 each
     // write-tree command
     // Takes the entries (from the index), and prepares the Tree objects
-    pub fn write_trees_from_index(entries: BTreeMap<String, IndexEntry>) -> std::io::Result<()> {
-        let mut flat_entries: BTreeMap<PathBuf, Vec<(PathBuf, IndexEntry)>> = BTreeMap::new();
+    pub fn write_trees_from_index(
+        entries: BTreeMap<String, IndexEntry>,
+    ) -> std::io::Result<HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>>> {
+        // Flatten the list of paths and combine all the files in each folder
+        // HashMap<"path_without_file", "file">
+        // Go through each entry and recurse the path
+        // Create trees and sha1 each
+        let mut flat_entries: HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>> = HashMap::new();
+        // Example index entries: "src/objects/blob.rs", "src/objects/tree.rs"
+        // flat_entries: HashMap<root/src/objects/, Vec<blob.rs, tree.rs(as index entries)>>
         for (path, entry) in entries {
             let path = PathBuf::from(path);
             // Paths such as "/" or "." should not be possible
             let file_name = path.file_name().unwrap().to_owned();
-            let mut root = PathBuf::from("root");
+
+            // Add "root" to the path to keep track of it
+            // /dir1/dir2/dir3/file.rs -> root/dir1/dir2/dir3/file.rs
+            let mut root = PathBuf::from("/").join(crate_name!());
             root.push(path);
             let parent_path = root.parent().filter(|p| *p != Path::new("")).unwrap();
+
             flat_entries
                 .entry(PathBuf::from(parent_path))
                 .or_default()
                 .push((PathBuf::from(file_name), entry));
         }
-        Self::build_trees(flat_entries)?;
-        Ok(())
+        Ok(flat_entries)
     }
 
-    fn build_trees(entries: BTreeMap<PathBuf, Vec<(PathBuf, IndexEntry)>>) -> std::io::Result<()> {
+    pub fn build_trees(
+        flat_entries: HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>>,
+    ) -> std::io::Result<Vec<Tree>> {
         // Create a hash table of all the folders and trees
         // Create and update trees and write to file at the end
         let mut tree_list: HashMap<PathBuf, Tree> = HashMap::new();
-        for (path, children) in entries {
+        for (path, children) in &flat_entries {
             let mut tree_entries: Vec<TreeEntry> = Vec::new();
+            // Create the blob for each file
             for (child, entry) in children {
+                dbg!(child.to_str().unwrap().to_string());
                 let blob_entry = TreeEntry {
                     mode: entry.mode.to_string(),
                     object_type: ObjectType::Blob,
@@ -200,26 +219,49 @@ impl Tree {
                 };
                 tree_entries.push(blob_entry);
             }
-            let path_comp = path
-                .components()
-                .map(|e| PathBuf::from(e.as_os_str()))
-                .collect::<Vec<PathBuf>>();
-            match tree_list.get(path_comp.last().unwrap()) {
-                Some(_) => {
-                    // Update the tree
-                    // let old_tree = tree_list.get(path_comp.last().unwrap()).unwrap();
-                    // let old_entries = &old_tree.entries;
-                }
-                None => {
-                    let tree = Self::from_entries(tree_entries)?;
-                    tree_list.insert(path_comp.last().unwrap().clone(), tree);
+            // Create new tree and add it
+            // Tree only contains blobs and belongs to the last folder down the path
+            let tree = Self::from_entries(tree_entries)?;
+            tree_list.insert(path.to_path_buf(), tree);
+        }
+        // Finished adding the files.
+        // Go through folder, bottom to top and create trees
+        // dir1/dir2/dir3
+        // Save them tree_entries root/as dir1/dir2/dir3, root/dir1/dir2, root/dir1 and root
+        for (mut path, _) in flat_entries {
+            loop {
+                if let Some(tree) = tree_list.get(&path) {
+                    if !path.pop() || path == PathBuf::from("/") {
+                        break;
+                    }
+                    let tree_name = path
+                        .file_name()
+                        .unwrap_or(path.as_os_str())
+                        .to_string_lossy()
+                        .into_owned();
+                    let tree_entry = TreeEntry {
+                        mode: "040000".to_string(),
+                        object_type: ObjectType::Tree,
+                        name: tree_name,
+                        hash: tree.hash,
+                    };
+                    let mut new_tree = vec![tree_entry];
+                    match tree_list.remove(&path) {
+                        Some(existing_tree) => {
+                            new_tree.extend(existing_tree.entries);
+                            let new_tree = Self::from_entries(new_tree)?;
+                            tree_list.insert(path.to_path_buf(), new_tree);
+                        }
+                        None => {
+                            let new_tree = Tree::from_entries(new_tree)?;
+                            tree_list.insert(path.to_path_buf(), new_tree);
+                        }
+                    }
                 }
             }
-            // Check if it folder exists in tree_list
-            // Add children entries into the vec of tree entries
-            //
         }
-        todo!()
+        let all_trees = tree_list.into_values().collect::<Vec<Tree>>();
+        Ok(all_trees)
     }
 }
 
