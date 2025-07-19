@@ -145,6 +145,7 @@ impl Tree {
             match mode.as_str() {
                 "100644" => objecttype = ObjectType::Blob,
                 "040000" => objecttype = ObjectType::Tree,
+                "40000" => objecttype = ObjectType::Tree,
                 _ => {
                     panic!("Invalid object type.")
                 }
@@ -226,8 +227,9 @@ impl Tree {
         }
         // Finished adding the files.
         // Go through folder, bottom to top and create trees
-        // dir1/dir2/dir3
-        // Save them tree_entries root/as dir1/dir2/dir3, root/dir1/dir2, root/dir1 and root
+        // Example: root/dir1/dir2/dir3
+        // The tree created so far represents dir3.
+        // Pop that and create new trees for each folder up the path
         for (mut path, _) in flat_entries {
             loop {
                 if let Some(tree) = tree_list.get(&path) {
@@ -240,23 +242,18 @@ impl Tree {
                         .to_string_lossy()
                         .into_owned();
                     let tree_entry = TreeEntry {
-                        mode: "040000".to_string(),
+                        mode: "40000".to_string(),
                         object_type: ObjectType::Tree,
                         name: tree_name,
                         hash: tree.hash,
                     };
-                    let mut new_tree = vec![tree_entry];
-                    match tree_list.remove(&path) {
-                        Some(existing_tree) => {
-                            new_tree.extend(existing_tree.entries);
-                            let new_tree = Self::from_entries(new_tree)?;
-                            tree_list.insert(path.to_path_buf(), new_tree);
-                        }
-                        None => {
-                            let new_tree = Tree::from_entries(new_tree)?;
-                            tree_list.insert(path.to_path_buf(), new_tree);
-                        }
+                    let mut new_tree_vec = vec![tree_entry];
+                    if let Some(existing_tree) = tree_list.remove(&path) {
+                        // A tree was already made for this dir. Remove and add those entries
+                        new_tree_vec.extend(existing_tree.entries);
                     }
+                    let new_tree = Self::from_entries(new_tree_vec)?;
+                    tree_list.insert(path.to_path_buf(), new_tree);
                 }
             }
         }
