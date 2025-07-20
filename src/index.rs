@@ -1,8 +1,13 @@
 use core::fmt;
 use std::{
-    collections::BTreeMap, fmt::Display, io::Write, os::unix::fs::MetadataExt, path::PathBuf,
+    collections::BTreeMap,
+    fmt::Display,
+    io::Write,
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
 };
 
+use ignore::gitignore::GitignoreBuilder;
 use sha1::{Digest, Sha1};
 
 use crate::{
@@ -216,6 +221,9 @@ impl Index {
         let mut stack = vec![path];
         while let Some(current_path) = stack.pop() {
             if current_path.is_file() {
+                if Self::exists_in_git_ignore(&current_path)? {
+                    continue;
+                }
                 // 1. Get entry - index the file
                 let entry = Self::index_entry_from_file(&current_path)?;
                 let key: String = current_path.to_string_lossy().into();
@@ -246,6 +254,9 @@ impl Index {
                 if current_path.ends_with(".git_rust") {
                     continue;
                 }
+                if Self::exists_in_git_ignore(&current_path)? {
+                    continue;
+                }
 
                 for entry in std::fs::read_dir(current_path)? {
                     let entry = entry?.path();
@@ -257,6 +268,16 @@ impl Index {
         let index = Self::from_entries(entries);
         index.write_index_to_file()?;
         Ok(())
+    }
+
+    fn exists_in_git_ignore(path: &Path) -> std::io::Result<bool> {
+        let root = &RepoRust::get_root().base_path;
+        let mut builder = GitignoreBuilder::new(root);
+        builder.add(root.join(".gitignore"));
+        let matcher = builder.build().unwrap();
+
+        let is_ignored = matcher.matched(path, false).is_ignore();
+        Ok(is_ignored)
     }
 
     pub fn sha1_entry(file: &[u8]) -> [u8; 20] {

@@ -11,6 +11,7 @@ categories = ["command-line-utilities", "development-tools"]
 clap = { version = "4.5.40", features = ["cargo", "derive"] }
 flate2 = "1.1.2"
 hex = "0.4.3"
+ignore = "0.4.23"
 sha1 = "0.10.6"
 tempfile = "3.20.0"
 thread_local = "1.1.9"
