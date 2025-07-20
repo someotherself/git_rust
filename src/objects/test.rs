@@ -1,4 +1,6 @@
-use std::{io::Write, os::unix::fs::MetadataExt, path::PathBuf};
+use std::{collections::BTreeMap, io::Write, os::unix::fs::MetadataExt, path::PathBuf};
+
+use git2::IndexEntry;
 
 use crate::{
     git_rust::{self, BASE_DIR},
@@ -524,6 +526,96 @@ fn test_git_write_trees() {
 
         let entries_by_folder = Tree::group_entries_for_tree_build(index.entries);
         Tree::build_trees(entries_by_folder);
+    });
+}
+
+#[test]
+fn test_compare_index_with_git() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
+
+        // Create files in root
+        for i in 0..3 {
+            let mut file =
+                std::fs::File::create_new(path.join(PathBuf::from(format!("test{}.txt", i))))
+                    .unwrap();
+            file.write_all(format!("Test file {} in root", i).as_bytes())
+                .unwrap();
+        }
+
+        // Create folder 1 and files to hash
+        let path_folder_1 = path.join("folder_1");
+        let path_folder_1_str = path_folder_1.to_str().unwrap();
+        std::fs::create_dir_all(&path_folder_1).unwrap();
+        for i in 0..5 {
+            let mut file =
+                std::fs::File::create_new(path_folder_1.join(format!("file_in_dir1_{}", i)))
+                    .unwrap();
+            file.write_all(format!("This is test file number {}", i).as_bytes())
+                .unwrap();
+        }
+
+        // Create folder 2 in folder 1 and files to hash
+        let path_folder_2 = path_folder_1.join("folder_2");
+        let path_folder_2_str = path_folder_2.to_str().unwrap();
+        std::fs::create_dir_all(&path_folder_2).unwrap();
+
+        for i in 0..3 {
+            let mut file =
+                std::fs::File::create_new(path_folder_2.join(format!("file_in_dir2_{}", i)))
+                    .unwrap();
+            file.write_all(format!("This is test file number {}", i).as_bytes())
+                .unwrap();
+        }
+
+        assert!(path_folder_1.exists());
+        assert!(path_folder_2.exists());
+        assert!(path_folder_1.join(format!("file_in_dir1_0")).exists());
+        assert!(path_folder_1.join(format!("file_in_dir1_1")).exists());
+        assert!(path_folder_1.join(format!("file_in_dir1_2")).exists());
+        assert!(path_folder_1.join(format!("file_in_dir1_3")).exists());
+        assert!(path_folder_1.join(format!("file_in_dir1_4")).exists());
+        assert!(path_folder_2.join(format!("file_in_dir2_0")).exists());
+        assert!(path_folder_2.join(format!("file_in_dir2_1")).exists());
+        assert!(path_folder_2.join(format!("file_in_dir2_2")).exists());
+        assert!(path.join(PathBuf::from("test1.txt")).exists());
+        assert!(path.join(PathBuf::from("test2.txt")).exists());
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        // INDEX the root with git_rust
+        let root_as_str = path.to_str().unwrap();
+        let add_args = run_test_matches(vec!["", "add", root_as_str]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+
+        let rust_index = Index::read_index().unwrap();
+
+        // Create a .gitignore file for .git_rust
+        std::fs::write(path.join(".gitignore"), ".git_rust/\n.gitignore\n").unwrap();
+
+        // INDEX the root with git
+        use git2::Repository;
+        let repo = Repository::init(path).unwrap();
+        let mut git_index = repo.index().unwrap();
+        git_index
+            .add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)
+            .unwrap();
+        git_index.write().unwrap();
+
+        let mut git_map: BTreeMap<String, git2::IndexEntry> = BTreeMap::new();
+        for entry in git_index.iter() {
+            let path_str = std::str::from_utf8(&entry.path).unwrap().to_string();
+            git_map.insert(path_str, entry);
+        }
+
+        assert_eq!(
+            rust_index.entries.len(),
+            git_map.len(),
+            "Index entry count mismatch"
+        );
     });
 }
 
