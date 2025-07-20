@@ -522,7 +522,7 @@ fn test_git_write_trees() {
 
         let index = Index::read_index().unwrap();
 
-        let flat_entries = Tree::write_trees_from_index(index.entries).unwrap();
-        Tree::build_trees(flat_entries).unwrap();
+        let entries_by_folder = Tree::group_entries_for_tree_build(index.entries).unwrap();
+        Tree::build_trees(entries_by_folder).unwrap();
     });
 }

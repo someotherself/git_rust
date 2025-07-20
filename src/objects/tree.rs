@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Display;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use clap::{ArgMatches, crate_name};
 use flate2::bufread::ZlibDecoder;
+use flate2::{Compress, Compression, write::ZlibEncoder};
 use hex::ToHex;
 use sha1::{Digest, Sha1};
 
@@ -35,8 +36,8 @@ impl Tree {
     // write-tree TODO
     pub fn encode_object() -> std::io::Result<()> {
         let index = Index::read_index()?;
-        let flat_entries = Self::write_trees_from_index(index.entries)?;
-        let _trees = Self::build_trees(flat_entries)?;
+        let entries_by_folder = Self::group_entries_for_tree_build(index.entries)?;
+        let _trees = Self::build_trees(entries_by_folder)?;
         // Self::write_object_to_file(trees)?; // TODO
         Ok(())
     }
@@ -78,12 +79,57 @@ impl Tree {
         Ok(tree)
     }
 
-    fn write_object_to_file(_trees: Vec<Tree>) -> std::io::Result<()> {
-        todo!()
+    fn write_object_to_file(trees: Vec<Tree>) -> std::io::Result<()> {
+        let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().base_path);
+        for tree in trees {
+            let mut content: Vec<u8> = Vec::new();
+            let hex_hash = hex::encode(tree.hash);
+            let (folder_name, file_name) = hex_hash.split_at(2);
+
+            let folder_path = objects_path.join(folder_name);
+            let file_path = folder_path.join(file_name);
+
+            if !folder_path.exists() {
+                std::fs::create_dir(folder_path)?;
+            }
+            let new_tree = std::fs::File::create(file_path)?;
+
+            let mut enc =
+                ZlibEncoder::new_with_compress(new_tree, Compress::new(Compression::best(), true));
+
+            let header = format!("tree {}\0", tree.header.size);
+
+            content.extend_from_slice(header.as_bytes());
+
+            for entry in tree.entries {
+                let mode = entry.mode;
+                let tree_name = entry.name;
+                content.extend_from_slice(mode.as_bytes());
+                content.extend_from_slice(b" ");
+                content.extend_from_slice(tree_name.as_bytes());
+                content.extend_from_slice(b"\0");
+                content.extend_from_slice(&entry.hash);
+            }
+            enc.write_all(&content)?;
+            enc.finish()?;
+        }
+        Ok(())
     }
 
-    // Will create a Tree struct given a Vec of TreeEntries
-    pub fn from_entries(entries: Vec<TreeEntry>) -> std::io::Result<Self> {
+    // Will create and sort Tree struct given a Vec of TreeEntries
+    pub fn from_entries(mut entries: Vec<TreeEntry>) -> std::io::Result<Self> {
+        entries.sort_by(|a, b| {
+            let name_cmp = a.name.as_bytes().cmp(b.name.as_bytes());
+            if name_cmp == std::cmp::Ordering::Equal {
+                match (&a.object_type, &b.object_type) {
+                    (ObjectType::Blob, ObjectType::Tree) => std::cmp::Ordering::Less,
+                    (ObjectType::Tree, ObjectType::Blob) => std::cmp::Ordering::Greater,
+                    _ => std::cmp::Ordering::Equal,
+                }
+            } else {
+                name_cmp
+            }
+        });
         let header = Header::from_tree_entries(entries.len());
         let hash = Self::sha1_tree(&entries);
         Ok(Self {
@@ -172,16 +218,16 @@ impl Tree {
 
     // write-tree command
     // Takes the entries (from the index), and prepares the Tree objects
-    pub fn write_trees_from_index(
+    pub fn group_entries_for_tree_build(
         entries: BTreeMap<String, IndexEntry>,
     ) -> std::io::Result<HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>>> {
         // Flatten the list of paths and combine all the files in each folder
         // HashMap<"path_without_file", "file">
         // Go through each entry and recurse the path
         // Create trees and sha1 each
-        let mut flat_entries: HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>> = HashMap::new();
+        let mut entries_by_folder: HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>> = HashMap::new();
         // Example index entries: "src/objects/blob.rs", "src/objects/tree.rs"
-        // flat_entries: HashMap<root/src/objects/, Vec<blob.rs, tree.rs(as index entries)>>
+        // entries_by_folder: HashMap<root/src/objects/, Vec<blob.rs, tree.rs(as index entries)>>
         for (path, entry) in entries {
             let path = PathBuf::from(path);
             // Paths such as "/" or "." should not be possible
@@ -193,21 +239,21 @@ impl Tree {
             root.push(path);
             let parent_path = root.parent().filter(|p| *p != Path::new("")).unwrap();
 
-            flat_entries
+            entries_by_folder
                 .entry(PathBuf::from(parent_path))
                 .or_default()
                 .push((PathBuf::from(file_name), entry));
         }
-        Ok(flat_entries)
+        Ok(entries_by_folder)
     }
 
     pub fn build_trees(
-        flat_entries: HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>>,
+        entries_by_folder: HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>>,
     ) -> std::io::Result<Vec<Tree>> {
         // Create a hash table of all the folders and trees
         // Create and update trees and write to file at the end
         let mut tree_list: HashMap<PathBuf, Tree> = HashMap::new();
-        for (path, children) in &flat_entries {
+        for (path, children) in &entries_by_folder {
             let mut tree_entries: Vec<TreeEntry> = Vec::new();
             // Create the blob for each file
             for (child, entry) in children {
@@ -230,7 +276,7 @@ impl Tree {
         // Example: root/dir1/dir2/dir3
         // The tree created so far represents dir3.
         // Pop that and create new trees for each folder up the path
-        for (mut path, _) in flat_entries {
+        for (mut path, _) in entries_by_folder {
             loop {
                 if let Some(tree) = tree_list.get(&path) {
                     if !path.pop() || path == PathBuf::from("/") {
