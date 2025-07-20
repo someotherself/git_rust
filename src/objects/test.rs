@@ -590,7 +590,16 @@ fn test_compare_index_with_git() {
         let rust_index = Index::read_index().unwrap();
 
         // Create a .gitignore file for .git_rust
-        std::fs::write(path.join(".gitignore"), ".git_rust/\n.gitignore\n").unwrap();
+        std::fs::write(
+            path.join(".gitignore"),
+            ".git_rust/\n.gitignore\n.gitrust_ignore\n",
+        )
+        .unwrap();
+        std::fs::write(
+            path.join(".gitrust_ignore"),
+            ".git_rust/\n.gitignore\n.gitrust_ignore\n",
+        )
+        .unwrap();
 
         // INDEX the root with git
         use git2::Repository;
@@ -713,5 +722,72 @@ fn test_read_index_created_by_git() {
         let mtime_nano = file_to_check.metadata().unwrap().mtime_nsec();
         assert_eq!(entry.mtime as i64, mtime);
         assert_eq!(entry.mtime_nanos as i64, mtime_nano);
+    });
+}
+
+#[test]
+fn test_git_ignore() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
+
+        // Create files in root
+        for i in 0..3 {
+            let mut file =
+                std::fs::File::create_new(path.join(PathBuf::from(format!("test{}.txt", i))))
+                    .unwrap();
+            file.write_all(format!("Test file {} in root", i).as_bytes())
+                .unwrap();
+        }
+
+        // Create folder 1 and files to hash
+        let path_folder_1 = path.join("folder_1");
+        std::fs::create_dir_all(&path_folder_1).unwrap();
+        for i in 0..5 {
+            let mut file =
+                std::fs::File::create_new(path_folder_1.join(format!("file_in_dir1_{}", i)))
+                    .unwrap();
+            file.write_all(format!("This is test file number {}", i).as_bytes())
+                .unwrap();
+        }
+
+        // Create folder 2 in folder 1 and files to hash
+        let path_folder_2 = path_folder_1.join("folder_2");
+        std::fs::create_dir_all(&path_folder_2).unwrap();
+
+        for i in 0..3 {
+            let mut file =
+                std::fs::File::create_new(path_folder_2.join(format!("file_in_dir2_{}", i)))
+                    .unwrap();
+            file.write_all(format!("This is test file number {}", i).as_bytes())
+                .unwrap();
+        }
+
+        // Create .gitignore file - total 11 files
+        // Ignore folder1/folder2 - 3 files
+        // Ignore test0.txt - 1 file
+        std::fs::write(
+            path.join(".gitignore"),
+            ".git_rust/\n.gitignore\nfolder_1/folder_2\ntest0.txt\ngitrust_ignore\n",
+        )
+        .unwrap();
+        std::fs::write(
+            path.join(".gitrust_ignore"),
+            ".git_rust/\n.gitignore\nfolder_1/folder_2\ntest0.txt\n.gitrust_ignore\n",
+        )
+        .unwrap();
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        // INDEX the root with git_rust
+        let root_as_str = path.to_str().unwrap();
+        let add_args = run_test_matches(vec!["", "add", root_as_str]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+
+        let rust_index = Index::read_index().unwrap();
+
+        assert_eq!(rust_index.entries.len(), 11 - 4);
     });
 }
