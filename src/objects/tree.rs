@@ -256,7 +256,6 @@ impl Tree {
             let mut tree_entries: Vec<TreeEntry> = Vec::new();
             // Create the blob for each file
             for (child, entry) in children {
-                dbg!(child.to_str().unwrap().to_string());
                 let blob_entry = TreeEntry {
                     mode: entry.mode.to_string(),
                     object_type: ObjectType::Blob,
