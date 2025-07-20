@@ -362,11 +362,14 @@ impl Index {
         Ok(())
     }
 
+    // TODO: Find out why it prints entries ./ in front
     pub fn read_index() -> std::io::Result<Self> {
         let index_path = &RepoRust::get_root().base_path.join(BASE_DIR).join("index");
         let file = std::fs::read(index_path)?;
-
         // Parse header
+        if file.len() < 12 {
+            return Ok(Index::default());
+        }
         let header = IndexHeader::header(&file[..12])?;
         let total_entries = u32::from_be_bytes(header.entries);
 
