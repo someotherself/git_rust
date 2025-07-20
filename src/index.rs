@@ -387,7 +387,6 @@ impl Index {
 
     pub fn ls_index() -> std::io::Result<BTreeMap<String, IndexEntry>> {
         let index = Self::read_index()?;
-        println!("{:?}", index.header.entries);
         Ok(index.entries)
     }
 }

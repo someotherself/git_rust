@@ -1,7 +1,5 @@
 use std::{collections::BTreeMap, io::Write, os::unix::fs::MetadataExt, path::PathBuf};
 
-use git2::IndexEntry;
-
 use crate::{
     git_rust::{self, BASE_DIR},
     index::Index,
@@ -547,7 +545,6 @@ fn test_compare_index_with_git() {
 
         // Create folder 1 and files to hash
         let path_folder_1 = path.join("folder_1");
-        let path_folder_1_str = path_folder_1.to_str().unwrap();
         std::fs::create_dir_all(&path_folder_1).unwrap();
         for i in 0..5 {
             let mut file =
@@ -559,7 +556,6 @@ fn test_compare_index_with_git() {
 
         // Create folder 2 in folder 1 and files to hash
         let path_folder_2 = path_folder_1.join("folder_2");
-        let path_folder_2_str = path_folder_2.to_str().unwrap();
         std::fs::create_dir_all(&path_folder_2).unwrap();
 
         for i in 0..3 {
