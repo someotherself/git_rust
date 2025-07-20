@@ -526,3 +526,104 @@ fn test_git_write_trees() {
         Tree::build_trees(entries_by_folder).unwrap();
     });
 }
+
+#[test]
+fn test_read_index_created_by_git() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
+
+        // Create files in root
+        for i in 0..3 {
+            let mut file =
+                std::fs::File::create_new(path.join(PathBuf::from(format!("test{}.txt", i))))
+                    .unwrap();
+            file.write_all(format!("Test file {} in root", i).as_bytes())
+                .unwrap();
+        }
+
+        // Create folder 1 and files to hash
+        let path_folder_1 = path.join("folder_1");
+        std::fs::create_dir_all(&path_folder_1).unwrap();
+        for i in 0..5 {
+            let mut file =
+                std::fs::File::create_new(path_folder_1.join(format!("file_in_dir1_{}", i)))
+                    .unwrap();
+            file.write_all(format!("This is test file number {}", i).as_bytes())
+                .unwrap();
+        }
+
+        // Create folder 2 in folder 1 and files to hash
+        let path_folder_2 = path_folder_1.join("folder_2");
+        std::fs::create_dir_all(&path_folder_2).unwrap();
+
+        for i in 0..3 {
+            let mut file =
+                std::fs::File::create_new(path_folder_2.join(format!("file_in_dir2_{}", i)))
+                    .unwrap();
+            file.write_all(format!("This is test file number {}", i).as_bytes())
+                .unwrap();
+        }
+
+        // INDEX the root with git
+        use git2::Repository;
+        let repo = Repository::init(&path).unwrap();
+        let mut index = repo.index().unwrap();
+        index
+            .add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)
+            .unwrap();
+        index.write().unwrap();
+
+        let git_index = path.join(".git").join("index");
+        assert!(git_index.exists());
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+        let repo_index = path.join(".git_rust").join("index");
+
+        std::fs::copy(&git_index, &repo_index).unwrap();
+        assert!(repo_index.exists());
+
+        let index = Index::read_index().unwrap();
+        for (idx, (_, entry)) in index.entries.iter().enumerate() {
+            let all_files_indexed = Vec::from([
+                "folder_1/file_in_dir1_0",
+                "folder_1/file_in_dir1_1",
+                "folder_1/file_in_dir1_2",
+                "folder_1/file_in_dir1_3",
+                "folder_1/file_in_dir1_4",
+                "folder_1/folder_2/file_in_dir2_0",
+                "folder_1/folder_2/file_in_dir2_1",
+                "folder_1/folder_2/file_in_dir2_2",
+                "test0.txt",
+                "test1.txt",
+                "test2.txt",
+            ]);
+            let path_str = str::from_utf8(&entry.path).unwrap();
+            assert_eq!(path_str, all_files_indexed[idx]);
+        }
+        let path_to_check = "folder_1/file_in_dir1_2";
+        let abs_path_to_check = path.join("folder_1/file_in_dir1_2");
+        assert_eq!(index.entries.len(), 11);
+
+        let entries = index.entries;
+        let entry = entries.get(path_to_check).unwrap();
+        let path_length = path_to_check.len();
+        assert_eq!((entry.flags & 0x0FFF) as usize, path_length);
+        let file_to_check = std::fs::File::open(abs_path_to_check).unwrap();
+
+        let ctime = file_to_check.metadata().unwrap().ctime();
+        let ctime_nano = file_to_check.metadata().unwrap().ctime_nsec();
+        assert_eq!(entry.ctime as i64, ctime);
+        assert_eq!(entry.ctime_nanos as i64, ctime_nano);
+
+        let inode = file_to_check.metadata().unwrap().ino();
+        assert_eq!(entry.ino as u64, inode);
+
+        let mtime = file_to_check.metadata().unwrap().mtime();
+        let mtime_nano = file_to_check.metadata().unwrap().mtime_nsec();
+        assert_eq!(entry.mtime as i64, mtime);
+        assert_eq!(entry.mtime_nanos as i64, mtime_nano);
+    });
+}
