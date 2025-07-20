@@ -36,8 +36,8 @@ impl Tree {
     // write-tree TODO
     pub fn encode_object() -> std::io::Result<()> {
         let index = Index::read_index()?;
-        let entries_by_folder = Self::group_entries_for_tree_build(index.entries)?;
-        let _trees = Self::build_trees(entries_by_folder)?;
+        let entries_by_folder = Self::group_entries_for_tree_build(index.entries);
+        let _trees = Self::build_trees(entries_by_folder);
         // Self::write_object_to_file(trees)?; // TODO
         Ok(())
     }
@@ -79,7 +79,7 @@ impl Tree {
         Ok(tree)
     }
 
-    fn write_object_to_file(trees: Vec<Tree>) -> std::io::Result<()> {
+    fn write_object_to_file(trees: Vec<Self>) -> std::io::Result<()> {
         let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().base_path);
         for tree in trees {
             let mut content: Vec<u8> = Vec::new();
@@ -117,7 +117,7 @@ impl Tree {
     }
 
     // Will create and sort Tree struct given a Vec of TreeEntries
-    pub fn from_entries(mut entries: Vec<TreeEntry>) -> std::io::Result<Self> {
+    pub fn from_entries(mut entries: Vec<TreeEntry>) -> Self {
         entries.sort_by(|a, b| {
             let name_cmp = a.name.as_bytes().cmp(b.name.as_bytes());
             if name_cmp == std::cmp::Ordering::Equal {
@@ -132,11 +132,11 @@ impl Tree {
         });
         let header = Header::from_tree_entries(entries.len());
         let hash = Self::sha1_tree(&entries);
-        Ok(Self {
+        Self {
             header,
             hash,
             entries,
-        })
+        }
     }
 
     // Will prepare the hash for a tree from a Vec of TreeEntries
@@ -190,8 +190,7 @@ impl Tree {
             let objecttype: ObjectType;
             match mode.as_str() {
                 "100644" => objecttype = ObjectType::Blob,
-                "040000" => objecttype = ObjectType::Tree,
-                "40000" => objecttype = ObjectType::Tree,
+                "040000" | "40000" => objecttype = ObjectType::Tree,
                 _ => {
                     panic!("Invalid object type.")
                 }
@@ -220,7 +219,7 @@ impl Tree {
     // Takes the entries (from the index), and prepares the Tree objects
     pub fn group_entries_for_tree_build(
         entries: BTreeMap<String, IndexEntry>,
-    ) -> std::io::Result<HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>>> {
+    ) -> HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>> {
         // Flatten the list of paths and combine all the files in each folder
         // HashMap<"path_without_file", "file">
         // Go through each entry and recurse the path
@@ -244,15 +243,15 @@ impl Tree {
                 .or_default()
                 .push((PathBuf::from(file_name), entry));
         }
-        Ok(entries_by_folder)
+        entries_by_folder
     }
 
     pub fn build_trees(
         entries_by_folder: HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>>,
-    ) -> std::io::Result<Vec<Tree>> {
+    ) -> Vec<Self> {
         // Create a hash table of all the folders and trees
         // Create and update trees and write to file at the end
-        let mut tree_list: HashMap<PathBuf, Tree> = HashMap::new();
+        let mut tree_list: HashMap<PathBuf, Self> = HashMap::new();
         for (path, children) in &entries_by_folder {
             let mut tree_entries: Vec<TreeEntry> = Vec::new();
             // Create the blob for each file
@@ -268,8 +267,8 @@ impl Tree {
             }
             // Create new tree and add it
             // Tree only contains blobs and belongs to the last folder down the path
-            let tree = Self::from_entries(tree_entries)?;
-            tree_list.insert(path.to_path_buf(), tree);
+            let tree = Self::from_entries(tree_entries);
+            tree_list.insert(path.clone(), tree);
         }
         // Finished adding the files.
         // Go through folder, bottom to top and create trees
@@ -298,13 +297,12 @@ impl Tree {
                         // A tree was already made for this dir. Remove and add those entries
                         new_tree_vec.extend(existing_tree.entries);
                     }
-                    let new_tree = Self::from_entries(new_tree_vec)?;
-                    tree_list.insert(path.to_path_buf(), new_tree);
+                    let new_tree = Self::from_entries(new_tree_vec);
+                    tree_list.insert(path.clone(), new_tree);
                 }
             }
         }
-        let all_trees = tree_list.into_values().collect::<Vec<Tree>>();
-        Ok(all_trees)
+        tree_list.into_values().collect::<Vec<Self>>()
     }
 }
 

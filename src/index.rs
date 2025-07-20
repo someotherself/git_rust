@@ -62,7 +62,7 @@ impl IndexHeader {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexEntry {
     pub ctime: u32,
     pub ctime_nanos: u32,

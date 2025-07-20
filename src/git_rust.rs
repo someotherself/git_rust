@@ -89,13 +89,12 @@ impl RepoRust {
         let head = root.base_path.join(BASE_DIR).join("HEAD");
         if head.try_exists()? {
             return Err(Error::other("Git already initialized!"));
-        } else {
-            fs::create_dir(root.base_path.join(BASE_DIR))?;
-            fs::create_dir(root.base_path.join(BASE_DIR).join("objects"))?;
-            fs::create_dir(root.base_path.join(BASE_DIR).join("refs"))?;
-            fs::write(head, "ref: refs/heads/master\n")?;
-            println!("Initialized git directory!");
         }
+        fs::create_dir(root.base_path.join(BASE_DIR))?;
+        fs::create_dir(root.base_path.join(BASE_DIR).join("objects"))?;
+        fs::create_dir(root.base_path.join(BASE_DIR).join("refs"))?;
+        fs::write(head, "ref: refs/heads/master\n")?;
+        println!("Initialized git directory!");
         Ok(())
     }
 
