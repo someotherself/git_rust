@@ -1,5 +1,5 @@
 use clap::{Arg, ArgAction, ArgMatches, Command, command};
-use std::{ops::Deref, path::Path, sync::Mutex};
+use std::{ops::Deref, path::{Path, PathBuf}, sync::Mutex};
 use tempfile::{Builder, TempDir};
 use thread_local::ThreadLocal;
 

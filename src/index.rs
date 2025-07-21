@@ -207,7 +207,7 @@ impl Index {
     //      B. Path does not exist in index              -> Add to index. Persist change
     //      C. Path exists and SHA1 is same              -> Move on
     pub fn build_index(path: String) -> std::io::Result<()> {
-        let root = &RepoRust::get_root().base_path;
+        let root = &RepoRust::get_root().absolute_path;
         // let mut entries: BTreeMap<String, IndexEntry> = BTreeMap::new();
         // if root.join(BASE_DIR).join("index").exists() {
         //     entries = Self::read_index()?.entries;
@@ -271,7 +271,7 @@ impl Index {
     }
 
     fn exists_in_git_ignore(path: &Path, is_dir: bool) -> std::io::Result<bool> {
-        let root = &RepoRust::get_root().base_path;
+        let root = &RepoRust::get_root().absolute_path;
         let mut builder = GitignoreBuilder::new(root);
         builder.add(root.join(".gitrust_ignore"));
         let matcher = builder.build().unwrap();
@@ -343,7 +343,10 @@ impl Index {
 
     fn write_index_to_file(&self) -> std::io::Result<()> {
         let mut buffer = Vec::new();
-        let index_path = &RepoRust::get_root().base_path.join(BASE_DIR).join("index");
+        let index_path = &RepoRust::get_root()
+            .absolute_path
+            .join(BASE_DIR)
+            .join("index");
 
         let header = self.header();
         let header_bytes = header.to_bytes();
@@ -364,7 +367,10 @@ impl Index {
 
     // TODO: Find out why it prints entries ./ in front
     pub fn read_index() -> std::io::Result<Self> {
-        let index_path = &RepoRust::get_root().base_path.join(BASE_DIR).join("index");
+        let index_path = &RepoRust::get_root()
+            .absolute_path
+            .join(BASE_DIR)
+            .join("index");
         let file = std::fs::read(index_path)?;
         // Parse header
         if file.len() < 12 {

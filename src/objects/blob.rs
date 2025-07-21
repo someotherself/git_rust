@@ -43,7 +43,7 @@ impl Blob {
 
     // cat-file command
     pub fn decode_object(hash: &str) -> std::io::Result<Vec<u8>> {
-        let root_path = RepoRust::get_object_folder(&RepoRust::get_root().base_path);
+        let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
         let (folder_name, file_name) = hash.split_at(2);
         let file_path = root_path.join(folder_name).join(file_name);
         let file = std::fs::read(file_path)?;
@@ -72,7 +72,7 @@ impl Blob {
     }
 
     pub fn write_object_to_file(&self, file: &[u8]) -> std::io::Result<()> {
-        let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().base_path);
+        let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
         let folder_path = objects_path.join(&self.folder);
         let file_path = folder_path.join(&self.file);
         if !folder_path.exists() {
@@ -135,7 +135,7 @@ impl Blob {
     }
 
     pub fn blob_exists(hash: [u8; 20]) -> bool {
-        let root = &RepoRust::get_root().base_path;
+        let root = &RepoRust::get_root().absolute_path;
         let obj_path = RepoRust::get_object_folder(root);
         let hex_hash = hex::encode(hash);
         let (folder_name, file_name) = hex_hash.split_at(2);

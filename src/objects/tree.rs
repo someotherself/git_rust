@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use clap::{ArgMatches, crate_name};
+use clap::ArgMatches;
 use flate2::bufread::ZlibDecoder;
 use flate2::{Compress, Compression, write::ZlibEncoder};
 use hex::ToHex;
@@ -33,18 +33,17 @@ impl Tree {
         &self.header
     }
 
-    // write-tree TODO
     pub fn encode_object() -> std::io::Result<()> {
         let index = Index::read_index()?;
         let entries_by_folder = Self::group_entries_for_tree_build(index.entries);
-        let _trees = Self::build_trees(entries_by_folder);
-        // Self::write_object_to_file(trees)?; // TODO
+        let trees = Self::build_trees(entries_by_folder);
+        Self::write_object_to_file(trees)?;
         Ok(())
     }
 
     // ls-tree
     pub fn decode_object(args: &ArgMatches) -> std::io::Result<Self> {
-        let root_path = RepoRust::get_object_folder(&RepoRust::get_root().base_path);
+        let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
 
         let hash_str = args
             .get_one::<String>("hash")
@@ -80,7 +79,7 @@ impl Tree {
     }
 
     fn write_object_to_file(trees: Vec<Self>) -> std::io::Result<()> {
-        let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().base_path);
+        let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
         for tree in trees {
             let mut content: Vec<u8> = Vec::new();
             let hex_hash = hex::encode(tree.hash);

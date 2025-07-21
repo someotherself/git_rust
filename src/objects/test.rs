@@ -273,7 +273,7 @@ fn test_git_add_files() {
         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
         git_rust::RepoRust::init().unwrap();
         let index_path = &git_rust::RepoRust::get_root()
-            .base_path
+            .absolute_path
             .join(BASE_DIR)
             .join("index");
 

@@ -2,7 +2,7 @@ use clap::ArgMatches;
 use std::{
     fs,
     io::{Error, Write},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     sync::Arc,
 };
 use thread_local::ThreadLocal;
@@ -19,7 +19,8 @@ pub static REPO: ThreadLocal<Arc<RepoRust>> = ThreadLocal::new();
 // Built internally, to hold information about the repo
 // base_path - used finding the repo location when not in root
 pub struct RepoRust {
-    pub base_path: PathBuf,
+    pub absolute_path: PathBuf,
+    pub root_path: PathBuf,
 }
 
 #[allow(dead_code)]
@@ -27,7 +28,8 @@ impl RepoRust {
     // Used internaly. No connection to git init
     pub fn new_repo(path: &str) -> std::io::Result<()> {
         let repo = Self {
-            base_path: path.into(),
+            absolute_path: path.into(),
+            root_path: path.into(),
         };
 
         if REPO.get().is_some() {
@@ -61,8 +63,15 @@ impl RepoRust {
 
         let dir = Self::find_root()
             .unwrap_or_else(|_| std::env::current_dir().expect("Failed to read filesystem"));
+        let root = PathBuf::from(dir.file_name().unwrap());
 
-        REPO.get_or(|| Arc::new(Self { base_path: dir })).clone()
+        REPO.get_or(|| {
+            Arc::new(Self {
+                absolute_path: dir.clone(),
+                root_path: root,
+            })
+        })
+        .clone()
     }
 
     // Used by git init to find repo
@@ -84,15 +93,40 @@ impl RepoRust {
         root.join(BASE_DIR).join("objects")
     }
 
+    // Should not allow paths with // or ..
+    // Ensure paths are correctly parsed and inside root
+    // Correctly format the paths for the index
+    pub fn check_paths(path: String) -> std::io::Result<()> {
+        let path = Path::new(&path);
+        for comp in path.components() {
+            match comp {
+                Component::ParentDir => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "`..` not allowed in paths",
+                    ));
+                }
+                Component::RootDir | Component::Prefix(_) => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Absolute paths or prefixes not allowed",
+                    ));
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
     pub fn init() -> std::io::Result<()> {
         let root = Self::get_root();
-        let head = root.base_path.join(BASE_DIR).join("HEAD");
+        let head = root.absolute_path.join(BASE_DIR).join("HEAD");
         if head.try_exists()? {
             return Err(Error::other("Git already initialized!"));
         }
-        fs::create_dir(root.base_path.join(BASE_DIR))?;
-        fs::create_dir(root.base_path.join(BASE_DIR).join("objects"))?;
-        fs::create_dir(root.base_path.join(BASE_DIR).join("refs"))?;
+        fs::create_dir(root.absolute_path.join(BASE_DIR))?;
+        fs::create_dir(root.absolute_path.join(BASE_DIR).join("objects"))?;
+        fs::create_dir(root.absolute_path.join(BASE_DIR).join("refs"))?;
         fs::write(head, "ref: refs/heads/master\n")?;
         println!("Initialized git directory!");
         Ok(())
