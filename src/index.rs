@@ -206,28 +206,29 @@ impl Index {
     //      A. Path exists and SHA1 is different         -> Update index. Persist change
     //      B. Path does not exist in index              -> Add to index. Persist change
     //      C. Path exists and SHA1 is same              -> Move on
-    pub fn build_index(path: String) -> std::io::Result<()> {
-        let root = &RepoRust::get_root().absolute_path;
-        // let mut entries: BTreeMap<String, IndexEntry> = BTreeMap::new();
-        // if root.join(BASE_DIR).join("index").exists() {
-        //     entries = Self::read_index()?.entries;
-        // }
-        let mut entries = if root.join(BASE_DIR).join("index").exists() {
+    pub fn build_index(input: String) -> std::io::Result<()> {
+        let abs_root_path = &RepoRust::get_root().absolute_path;
+        let mut entries = if abs_root_path.join(BASE_DIR).join("index").exists() {
             Self::read_index()?.entries
         } else {
             BTreeMap::new()
         };
-        let path = PathBuf::from(path);
+        let path = abs_root_path.join(PathBuf::from(input));
+        dbg!(&path);
         let mut stack = vec![path];
         while let Some(current_path) = stack.pop() {
             if current_path.is_file() {
+                dbg!(&current_path);
                 if Self::exists_in_git_ignore(&current_path, false)? {
                     continue;
                 }
                 // 1. Get entry - index the file
                 let entry = Self::index_entry_from_file(&current_path)?;
-                let key: String = current_path.to_string_lossy().into();
-
+                let key: String = current_path
+                    .strip_prefix(abs_root_path)
+                    .unwrap()
+                    .to_string_lossy()
+                    .into();
                 // 2. Check if blob already exists on disk
                 let blob_exists = Blob::blob_exists(entry.sha1);
                 if !blob_exists {
@@ -303,7 +304,8 @@ impl Index {
         let file = std::fs::read(path)?;
         let sha1 = Self::sha1_entry(&file);
 
-        let path_str = path.to_string_lossy();
+        let cwd = &RepoRust::get_root().absolute_path;
+        let path_str = path.strip_prefix(cwd).unwrap().to_string_lossy();
         let name_len = path_str.len();
         let assume_valid = 0_u8;
         let extended = 0_u8;

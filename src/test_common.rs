@@ -11,8 +11,9 @@ use crate::git_rust::RepoRust;
 
 pub static SETUP_RESULT: ThreadLocal<Mutex<Option<TestSetup>>> = ThreadLocal::new();
 
+#[allow(dead_code)]
 pub struct TestDir {
-    root: TempDir,
+    pub root: TempDir,
     pub test_dir: PathBuf,
 }
 
