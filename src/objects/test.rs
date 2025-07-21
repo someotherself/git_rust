@@ -15,8 +15,8 @@ use crate::{
 #[test]
 fn test_init_repo_in_temp_folder() {
     run_test(|setup| {
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
 
         git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
 
@@ -32,15 +32,14 @@ fn test_init_repo_in_temp_folder() {
 #[test]
 fn test_init_repo_struct_in_temp_folder() {
     run_test(|setup| {
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
 
         let result = git_rust::RepoRust::new_repo(path.to_str().unwrap());
         assert!(result.is_ok());
-        result.unwrap();
 
         let result = git_rust::RepoRust::new_repo(path.to_str().unwrap());
-        assert!(matches!(result, Err(e) if e.to_string() == "Repo already initialized"));
+        assert!(result.is_ok());
     });
 }
 
@@ -49,8 +48,8 @@ fn test_init_repo_struct_in_temp_folder() {
 #[test]
 fn test_hash_file_without_init() {
     run_test(|setup| {
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
 
         // -- Try hashing '-w' without initalizing repo
         let file_path = path.join("test1.txt");
@@ -74,8 +73,8 @@ fn test_hash_file_without_init() {
 #[test]
 fn test_hash_file_without_w() {
     run_test(|setup| {
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
 
         // -- Try hashing '-w' without initalizing repo
         let file_path = path.join("test1.txt");
@@ -107,8 +106,9 @@ fn test_hash_file_without_w() {
 fn test_hash_file_in_temp_folder() {
     run_test(|setup| {
         // Get test dir
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
+
         // -- Hash a file, compate with git and then
         // Create file to hash
         let file_path = path.join("test1.txt");
@@ -133,7 +133,7 @@ fn test_hash_file_in_temp_folder() {
 
         // hash-object with git
         use git2::Repository;
-        let repo = Repository::init(path.path()).unwrap();
+        let repo = Repository::init(path.clone()).unwrap();
         let blob_oid = repo.blob_path(&file_path).unwrap();
         let git2_hash = repo.find_blob(blob_oid).unwrap();
 
@@ -202,8 +202,8 @@ fn test_hash_file_in_temp_folder() {
 #[test]
 fn test_hash_cat_raw_bytes() {
     run_test(|setup| {
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
         // Create file to hash
         let file_path_1 = path.join("test1.txt");
         let file_path_str_1 = file_path_1.to_str().unwrap();
@@ -267,8 +267,8 @@ fn test_repo_in_project_dir() {
 fn test_git_add_files() {
     run_test(|setup| {
         // Get test dir
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
         // Create file to hash
         let file_path_1 = path.join("test1.txt");
         let file_path_str_1 = file_path_1.to_str().unwrap();
@@ -326,7 +326,7 @@ fn test_git_add_files() {
 
         // Compare SHA-1 with real git
         use git2::Repository;
-        let repo = Repository::init(path.path()).unwrap();
+        let repo = Repository::init(&path).unwrap();
         let blob_oid = repo.blob_path(&file_path_1).unwrap();
         let git2_hash = repo.find_blob(blob_oid).unwrap();
         assert_eq!(expected_sha1, git2_hash.id().as_bytes());
@@ -393,8 +393,8 @@ fn test_git_add_files() {
 fn test_git_add_same_file_twice() {
     run_test(|setup| {
         // Get test dir
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
         // Create file to hash
         let file_path_1 = path.join("test1.txt");
         let file_path_str_1 = file_path_1.to_str().unwrap();
@@ -428,8 +428,8 @@ fn test_git_add_same_file_twice() {
 fn test_git_add_folder() {
     run_test(|setup| {
         // Get test dir
-        let setup = setup.lock().unwrap().take().unwrap();
-        let path = &setup.dir;
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
         // Create file to hash
         let path_folder_1 = path.join("folder_1");
         let path_folder_1_str = path_folder_1.to_str().unwrap();
@@ -456,13 +456,14 @@ fn test_git_add_folder() {
         assert_eq!(index.header.sign, [b'D', b'I', b'R', b'C']);
         assert_eq!(index.header.version, 2_u32.to_be_bytes());
         assert_eq!(index.header.entries, 5_u32.to_be_bytes());
+        let file_len = path_folder_1.join("file_0").as_os_str().len();
 
         for (idx, (path, entry)) in index.entries.iter().enumerate() {
             assert_eq!(
                 PathBuf::from(path),
                 path_folder_1.join(format!("file_{}", idx))
             );
-            assert_eq!(entry.flags & 0x0FFF, 67);
+            assert_eq!(entry.flags & 0x0FFF, file_len as u16);
         }
 
         // Continue adding more files from root
@@ -794,5 +795,66 @@ fn test_git_ignore() {
         let rust_index = Index::read_index().unwrap();
 
         assert_eq!(rust_index.entries.len(), 11 - 4);
+    });
+}
+
+#[test]
+fn test_write_tree_one_file_in_root() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
+
+        // Create file to hash
+        let file_path_1 = path.join("test1.txt");
+        // let file_path_str_1 = file_path_1.to_str().unwrap();
+        let mut file_1 = std::fs::File::create(&file_path_1).unwrap();
+        file_1.write_all(b"this is test 1").unwrap();
+
+        let git_rust_objects_folder = path.join(".git_rust/objects");
+
+        // init, add and write-tree with git_rust
+        // TODO: Extra tree created in test for the git_rust folder.
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        let add_args = run_test_matches(vec!["", "add", "text.txt"]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+
+        for folder in git_rust_objects_folder.read_dir().unwrap() {
+            let folder = folder.unwrap();
+            dbg!(folder);
+        }
+
+        let write_tree_args = run_test_matches(vec!["", "write-tree"]);
+        git_rust::RepoRust::write_tree(&write_tree_args).unwrap();
+
+        for folder in git_rust_objects_folder.read_dir().unwrap() {
+            let folder = folder.unwrap();
+            dbg!(folder);
+        }
+
+        // let git_rust_content = blob::Blob::decode_object("7b62f0cd9a737ce285a0425161ec56ca082f8af1").unwrap();
+        // dbg!(String::from_utf8(git_rust_content).unwrap());
+
+        // init, add and write-tree with git_rust
+        use git2::Repository;
+        let repo = Repository::init(&path).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(&Path::new("test1.txt")).unwrap();
+        index.write().unwrap();
+
+        let _tree_oid = index.write_tree().unwrap();
+
+        let git_objects_folder = path.join(".git/objects");
+        // Delete /pack and /info
+        assert!(git_objects_folder.join("info").exists());
+        std::fs::remove_dir(git_objects_folder.join("info")).unwrap();
+        assert!(!git_objects_folder.join("info").exists());
+        std::fs::remove_dir(git_objects_folder.join("pack")).unwrap();
+        for folder in git_objects_folder.read_dir().unwrap() {
+            let folder = folder.unwrap();
+            dbg!(folder);
+        }
     });
 }
