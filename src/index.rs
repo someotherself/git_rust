@@ -214,11 +214,9 @@ impl Index {
             BTreeMap::new()
         };
         let path = abs_root_path.join(PathBuf::from(input));
-        dbg!(&path);
         let mut stack = vec![path];
         while let Some(current_path) = stack.pop() {
             if current_path.is_file() {
-                dbg!(&current_path);
                 if Self::exists_in_git_ignore(&current_path, false)? {
                     continue;
                 }
@@ -304,6 +302,8 @@ impl Index {
         let file = std::fs::read(path)?;
         let sha1 = Self::sha1_entry(&file);
 
+        // Start with the absolute path and strip it
+        // to allow both tests dirs and normal operation
         let cwd = &RepoRust::get_root().absolute_path;
         let path_str = path.strip_prefix(cwd).unwrap().to_string_lossy();
         let name_len = path_str.len();
@@ -367,7 +367,6 @@ impl Index {
         Ok(())
     }
 
-    // TODO: Find out why it prints entries ./ in front
     pub fn read_index() -> std::io::Result<Self> {
         let index_path = &RepoRust::get_root()
             .absolute_path
