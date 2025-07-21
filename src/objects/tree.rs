@@ -220,6 +220,8 @@ impl Tree {
     pub fn group_entries_for_tree_build(
         entries: BTreeMap<String, IndexEntry>,
     ) -> HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>> {
+        // root must have a tree as well. Add it in front of the path
+        let mut root = RepoRust::get_root().root_path.clone();
         // Flatten the list of paths and combine all the files in each folder
         // HashMap<"path_without_file", "file">
         // Go through each entry and recurse the path
@@ -233,11 +235,8 @@ impl Tree {
             let file_name = path.file_name().unwrap().to_owned();
 
             // Add "root" to the path to keep track of it
-            // /dir1/dir2/dir3/file.rs -> root/dir1/dir2/dir3/file.rs
-            let mut root = PathBuf::from("/").join(crate_name!());
             root.push(path);
             let parent_path = root.parent().filter(|p| *p != Path::new("")).unwrap();
-
             entries_by_folder
                 .entry(PathBuf::from(parent_path))
                 .or_default()
@@ -277,7 +276,7 @@ impl Tree {
         for (mut path, _) in entries_by_folder {
             loop {
                 if let Some(tree) = tree_list.get(&path) {
-                    if !path.pop() || path == PathBuf::from("/") {
+                    if !path.pop() || path == PathBuf::from("/") || path == PathBuf::from("") {
                         break;
                     }
                     let tree_name = path
