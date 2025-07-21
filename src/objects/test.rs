@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, io::Write, os::unix::fs::MetadataExt, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    io::Write,
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     git_rust::{self, BASE_DIR},

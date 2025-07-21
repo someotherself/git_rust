@@ -63,6 +63,7 @@ impl Blob {
             .get_one::<String>("file")
             .expect("File is required.")
             .to_owned();
+        RepoRust::check_paths(object.clone())?;
         let file = std::fs::read(PathBuf::from(object))?;
         let blob = Self::blob_with_sha1(&file);
         if sub_arg {

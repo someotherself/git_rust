@@ -1,13 +1,19 @@
 use clap::{Arg, ArgAction, ArgMatches, Command, command};
-use std::{ops::Deref, path::{Path, PathBuf}, sync::Mutex};
+use std::{
+    ops::Deref,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 use tempfile::{Builder, TempDir};
 use thread_local::ThreadLocal;
+
+use crate::git_rust::RepoRust;
 
 pub static SETUP_RESULT: ThreadLocal<Mutex<Option<TestSetup>>> = ThreadLocal::new();
 
 pub struct TestDir {
     root: TempDir,
-    pub test_dir: String,
+    pub test_dir: PathBuf,
 }
 
 #[allow(dead_code)]
@@ -23,12 +29,7 @@ impl TestDir {
             .rand_bytes(4)
             .tempdir_in(cwd)
             .expect("Failed to create test dir");
-        let temp_dir = root
-            .path()
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned();
+        let temp_dir = PathBuf::from(root.path().file_name().unwrap());
         TestDir {
             root,
             test_dir: temp_dir,
@@ -36,7 +37,7 @@ impl TestDir {
     }
 
     pub fn path(&self) -> &Path {
-        &self.root.path()
+        &self.test_dir
     }
 }
 
@@ -123,12 +124,22 @@ fn ls_tree_mock(args: Vec<&str>) -> ArgMatches {
     arg
 }
 
+fn write_tree_mock(args: Vec<&str>) -> ArgMatches {
+    let matches = command!().subcommand(
+        Command::new("write-tree").about("Create a tree object from the current index"),
+    );
+    let mut matches = matches.get_matches_from(args);
+    let (_, arg) = matches.remove_subcommand().unwrap();
+    arg
+}
+
 pub fn run_test_matches(args: Vec<&str>) -> ArgMatches {
     match args[1] {
         "cat-file" => return cat_file_mock(args),
         "hash-object" => return hash_object_mock(args),
         "ls-tree" => return ls_tree_mock(args),
         "add" => return add_mock(args),
+        "write-tree" => return write_tree_mock(args),
         _ => panic!("Wrong test command!"),
     }
 }

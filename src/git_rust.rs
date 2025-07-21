@@ -27,7 +27,7 @@ pub struct RepoRust {
 #[allow(dead_code)]
 impl RepoRust {
     // Used internaly. No connection to git init
-pub fn new_repo(path: &str) -> std::io::Result<()> {
+    pub fn new_repo(path: &str) -> std::io::Result<()> {
         let path_buf = PathBuf::from(path);
         let root = path_buf
             .file_name()
@@ -174,6 +174,7 @@ pub fn new_repo(path: &str) -> std::io::Result<()> {
             .get_one::<String>("path")
             .expect("File is required.")
             .to_owned();
+        Self::check_paths(path.clone())?;
         Index::build_index(path)?;
         Ok(())
     }
