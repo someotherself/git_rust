@@ -3,7 +3,7 @@ use std::{
     fs,
     io::{Error, Write},
     path::{Component, Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 use thread_local::ThreadLocal;
 
@@ -14,10 +14,11 @@ use crate::{
 
 pub const BASE_DIR: &str = ".git_rust";
 
-pub static REPO: ThreadLocal<Arc<RepoRust>> = ThreadLocal::new();
+pub static REPO: ThreadLocal<Mutex<Option<Arc<RepoRust>>>> = ThreadLocal::new();
 
 // Built internally, to hold information about the repo
-// base_path - used finding the repo location when not in root
+// Used finding the repo location when not in root
+// root_path - relative path
 pub struct RepoRust {
     pub absolute_path: PathBuf,
     pub root_path: PathBuf,
@@ -26,17 +27,28 @@ pub struct RepoRust {
 #[allow(dead_code)]
 impl RepoRust {
     // Used internaly. No connection to git init
-    pub fn new_repo(path: &str) -> std::io::Result<()> {
-        let repo = Self {
-            absolute_path: path.into(),
-            root_path: path.into(),
-        };
+pub fn new_repo(path: &str) -> std::io::Result<()> {
+        let path_buf = PathBuf::from(path);
+        let root = path_buf
+            .file_name()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid path"))?
+            .into();
+        let repo = Arc::new(RepoRust {
+            absolute_path: path_buf,
+            root_path: root,
+        });
 
-        if REPO.get().is_some() {
-            return Err(Error::other("Repo already initialized"));
-        }
-        REPO.get_or(|| Arc::new(repo));
+        let cell = REPO.get_or(|| Mutex::new(None));
+        let mut guard = cell.lock().unwrap();
+        *guard = Some(repo);
         Ok(())
+    }
+
+    pub fn clear_repo() {
+        if let Some(mutex) = REPO.get() {
+            let mut guard = mutex.lock().unwrap();
+            guard.take();
+        }
     }
 
     // TODO
@@ -57,21 +69,23 @@ impl RepoRust {
 
     // Used by git init when repo already initialized (when testing)
     pub fn get_root() -> Arc<Self> {
-        if let Some(repo) = REPO.get() {
+        let mutex = REPO.get_or(|| Mutex::new(None));
+        let mut guard = mutex.lock().unwrap();
+
+        if let Some(repo) = &*guard {
             return repo.clone();
         }
 
         let dir = Self::find_root()
             .unwrap_or_else(|_| std::env::current_dir().expect("Failed to read filesystem"));
         let root = PathBuf::from(dir.file_name().unwrap());
+        let repo = Arc::new(Self {
+            absolute_path: dir,
+            root_path: root,
+        });
 
-        REPO.get_or(|| {
-            Arc::new(Self {
-                absolute_path: dir.clone(),
-                root_path: root,
-            })
-        })
-        .clone()
+        *guard = Some(Arc::clone(&repo));
+        repo
     }
 
     // Used by git init to find repo

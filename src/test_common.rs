@@ -51,6 +51,7 @@ where
         *setup = Some(TestSetup { dir });
     }
     f(setup);
+    RepoRust::clear_repo();
 }
 
 impl Deref for TestDir {
