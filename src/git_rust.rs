@@ -136,6 +136,7 @@ impl RepoRust {
     pub fn init() -> std::io::Result<()> {
         let root = Self::get_root();
         let head = root.absolute_path.join(BASE_DIR).join("HEAD");
+        dbg!(&head);
         if head.try_exists()? {
             return Err(Error::other("Git already initialized!"));
         }
