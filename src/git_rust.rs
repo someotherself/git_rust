@@ -19,6 +19,7 @@ pub static REPO: ThreadLocal<Mutex<Option<Arc<RepoRust>>>> = ThreadLocal::new();
 // Built internally, to hold information about the repo
 // Used finding the repo location when not in root
 // root_path - relative path
+#[allow(dead_code)]
 pub struct RepoRust {
     pub absolute_path: PathBuf,
     pub root_path: PathBuf,

@@ -37,6 +37,49 @@ impl Tree {
         let index = Index::read_index()?;
         let entries_by_folder = Self::group_entries_for_tree_build(index.entries);
         let trees = Self::build_trees(entries_by_folder);
+
+        // DEBUG ONLY
+        // for idx in 0..trees.len() {
+        //     let tree = &trees[idx];
+        //     let hash = hex::encode(tree.hash);
+        //     println!("\nTree #{} Hash: {}\n------------------", idx, hash);
+
+        //     let mut content_bytes = Vec::new();
+
+        //     for entry in &tree.entries {
+        //         let mode_str = match entry.object_type {
+        //             ObjectType::Blob => "100644",
+        //             ObjectType::Tree => "40000",
+        //             _ => continue,
+        //         };
+
+        //         let mut entry_bytes = Vec::new();
+        //         entry_bytes.extend_from_slice(mode_str.as_bytes());
+        //         entry_bytes.push(b' ');
+        //         entry_bytes.extend_from_slice(entry.name.as_bytes());
+        //         entry_bytes.push(0);
+        //         entry_bytes.extend_from_slice(&entry.hash);
+
+        //         println!("Entry:");
+        //         println!("  Mode : {}", mode_str);
+        //         println!("  Name : {}", entry.name);
+        //         println!("  Hash : {}", hex::encode(&entry.hash));
+        //         println!("  Bytes: {:?}", entry_bytes);
+
+        //         content_bytes.extend_from_slice(&entry_bytes);
+        //     }
+
+        //     let header = format!("tree {}\0", content_bytes.len());
+        //     println!("Header: {:?}", header.as_bytes());
+        //     println!("Full Content: {:?}", content_bytes);
+
+        //     let mut hasher = Sha1::new();
+        //     hasher.update(&header.as_bytes());
+        //     hasher.update(&content_bytes);
+        //     let computed_hash = hasher.finalize();
+        //     println!("Computed SHA1: {}", hex::encode(computed_hash));
+        // }
+
         Self::write_object_to_file(trees)?;
         Ok(())
     }
@@ -215,29 +258,27 @@ impl Tree {
     }
 
     // write-tree command
-    // Takes the entries (from the index), and prepares the Tree objects
+    // Takes the entries (from the index)
+    // Example input dir: dir1/dir2/dir3 with folder1 and folder2 inside
+    // Output: BtreeMap<"dir1/dir2/dir3".to_string Vec<("folder1 name", TreeEntry), ("folder2 name", TreeEntry)>>
     pub fn group_entries_for_tree_build(
         entries: BTreeMap<String, IndexEntry>,
-    ) -> HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>> {
+    ) -> BTreeMap<String, Vec<(PathBuf, IndexEntry)>> {
         // root must have a tree as well. Add it in front of the path
-        let mut root = RepoRust::get_root().root_path.clone();
-        // Flatten the list of paths and combine all the files in each folder
-        // HashMap<"path_without_file", "file">
-        // Go through each entry and recurse the path
-        // Create trees and sha1 each
-        let mut entries_by_folder: HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>> = HashMap::new();
-        // Example index entries: "src/objects/blob.rs", "src/objects/tree.rs"
-        // entries_by_folder: HashMap<root/src/objects/, Vec<blob.rs, tree.rs(as index entries)>>
+        // Group the list of paths and combine all the files in each folder
+        // BTreeMap<"path_without_file", <files>>
+        let mut entries_by_folder: BTreeMap<String, Vec<(PathBuf, IndexEntry)>> = BTreeMap::new();
         for (path, entry) in entries {
             let path = PathBuf::from(path);
             // Paths such as "/" or "." should not be possible
             let file_name = path.file_name().unwrap().to_owned();
 
-            // Add "root" to the path to keep track of it
-            root.push(path);
-            let parent_path = root.parent().filter(|p| *p != Path::new("")).unwrap();
+            let parent_path = path
+                .parent()
+                .filter(|p| *p != Path::new(""))
+                .unwrap_or(Path::new(""));
             entries_by_folder
-                .entry(PathBuf::from(parent_path))
+                .entry(parent_path.to_str().unwrap().into())
                 .or_default()
                 .push((PathBuf::from(file_name), entry));
         }
@@ -245,7 +286,7 @@ impl Tree {
     }
 
     pub fn build_trees(
-        entries_by_folder: HashMap<PathBuf, Vec<(PathBuf, IndexEntry)>>,
+        entries_by_folder: BTreeMap<String, Vec<(PathBuf, IndexEntry)>>,
     ) -> Vec<Self> {
         // Create a hash table of all the folders and trees
         // Create and update trees and write to file at the end
@@ -264,21 +305,28 @@ impl Tree {
             }
             // Create new tree and add it
             // Tree only contains blobs and belongs to the last folder down the path
+            tree_entries.sort_by(|a, b| a.name.as_bytes().cmp(b.name.as_bytes()));
             let tree = Self::from_entries(tree_entries);
-            tree_list.insert(path.clone(), tree);
+            tree_list.insert(PathBuf::from(path), tree);
         }
         // Finished adding the files.
         // Go through folder, bottom to top and create trees
         // Example: root/dir1/dir2/dir3
         // The tree created so far represents dir3.
-        // Pop that and create new trees for each folder up the path
-        for (mut path, _) in entries_by_folder {
-            loop {
-                if let Some(tree) = tree_list.get(&path) {
-                    if !path.pop() || path == PathBuf::from("/") || path == PathBuf::from("") {
-                        break;
-                    }
-                    let tree_name = path
+        // For keys dir1/dir2/dir3 btreemap will sort them like:
+        // "" (root)
+        // "dir1"
+        // "dir1/dir2"
+        // "dir1/dir2/dir3"
+        // Reverse this sort before iterating
+        for (path_str, _) in entries_by_folder.iter().rev() {
+            let path = PathBuf::from(path_str);
+            let mut current_path = path.clone();
+            for _ in 0..path.components().count() {
+                // Fetch the tree entries created before (the files) with key dir1/dir2/dir3
+                if let Some(child_tree) = tree_list.get(&current_path) {
+                    // Start with tree_name = dir3
+                    let tree_name = current_path
                         .file_name()
                         .unwrap_or(path.as_os_str())
                         .to_string_lossy()
@@ -287,16 +335,30 @@ impl Tree {
                         mode: "40000".to_string(),
                         object_type: ObjectType::Tree,
                         name: tree_name,
-                        hash: tree.hash,
+                        hash: child_tree.hash,
                     };
-                    let mut new_tree_vec = vec![tree_entry];
-                    if let Some(existing_tree) = tree_list.remove(&path) {
-                        // A tree was already made for this dir. Remove and add those entries
-                        new_tree_vec.extend(existing_tree.entries);
+                    let mut parent_path = current_path.clone();
+                    parent_path.pop();
+                    // parent_path is now ""
+                    if current_path.as_os_str().is_empty() {
+                        break;
                     }
-                    let new_tree = Self::from_entries(new_tree_vec);
-                    tree_list.insert(path.clone(), new_tree);
+
+                    // Check if dir3 exists in another tree. Key is "dir1/dir2"
+                    let mut new_entries = match tree_list.remove(&parent_path) {
+                        Some(existing) => existing.entries,
+                        None => Vec::new(),
+                    };
+                    // Avoid duplicate entries (maybe redundant?)
+                    if !new_entries.iter().any(|e| e.name == tree_entry.name) {
+                        new_entries.push(tree_entry);
+                    }
+                    // Entries in the tree need to be sorted
+                    new_entries.sort_by(|a, b| a.name.as_bytes().cmp(b.name.as_bytes()));
+                    let parent_tree = Self::from_entries(new_entries);
+                    tree_list.insert(parent_path.clone(), parent_tree);
                 }
+                current_path.pop();
             }
         }
         tree_list.into_values().collect::<Vec<Self>>()

@@ -1,12 +1,15 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
+    fs::ReadDir,
     io::Write,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
 
+use git2::IndexAddOption;
+
 use crate::{
-    git_rust::{self, BASE_DIR},
+    git_rust::{self, BASE_DIR, RepoRust},
     index::Index,
     objects::{blob, tree::Tree},
     test_common::{run_test, run_test_matches},
@@ -831,5 +834,126 @@ fn test_write_tree_one_file_in_root() {
         let git_objects = git_objects_folder.read_dir().unwrap().count();
         let rust_git_objects = git_rust_objects_folder.read_dir().unwrap().count();
         assert_eq!(git_objects, rust_git_objects);
+    });
+}
+
+#[test]
+fn test_write_tree_multiple_folders() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        // Use absolute path to match normal operation
+        let path = PathBuf::from(&setup.root.path());
+
+        // Create files in root
+        for i in 0..3 {
+            let mut file =
+                std::fs::File::create_new(path.join(PathBuf::from(format!("test{}.txt", i))))
+                    .unwrap();
+            file.write_all(format!("Test file {} in root", i).as_bytes())
+                .unwrap();
+        }
+
+        // Create folder 1 and files to hash
+        let path_folder_1 = path.join("folder_1");
+        std::fs::create_dir_all(&path_folder_1).unwrap();
+        for i in 0..5 {
+            let mut file =
+                std::fs::File::create_new(path_folder_1.join(format!("file_in_dir1_{}", i)))
+                    .unwrap();
+            file.write_all(format!("This is test file in dir1 number {}", i).as_bytes())
+                .unwrap();
+        }
+
+        // Create folder 2 in folder 1 and files to hash
+        let path_folder_2 = path_folder_1.join("folder_2");
+        std::fs::create_dir_all(&path_folder_2).unwrap();
+
+        for i in 0..3 {
+            let mut file =
+                std::fs::File::create_new(path_folder_2.join(format!("file_in_dir2_{}", i)))
+                    .unwrap();
+            file.write_all(format!("This is test in dir2 file number {}", i).as_bytes())
+                .unwrap();
+        }
+
+        std::fs::write(
+            path.join(".gitignore"),
+            ".git/\n.git_rust/\n.gitignore\n.gitrust_ignore\n",
+        )
+        .unwrap();
+        std::fs::write(
+            path.join(".gitrust_ignore"),
+            ".git/\n.git_rust/\n.gitignore\n.gitrust_ignore\n",
+        )
+        .unwrap();
+
+        // init, add and write-tree with git_rust
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        let add_args = run_test_matches(vec!["", "add", ""]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+        let write_tree_args = run_test_matches(vec!["", "write-tree"]);
+        git_rust::RepoRust::write_tree(&write_tree_args).unwrap();
+
+        // init, add and write-tree with git_rust
+        let git_path = &setup.test_dir;
+        use git2::Repository;
+        let repo = Repository::init(&git_path).unwrap();
+        let mut index = repo.index().unwrap();
+        index
+            .add_all(["."].iter(), IndexAddOption::DEFAULT, None)
+            .unwrap();
+
+        for entry in index.iter() {
+            let file_path = repo
+                .workdir()
+                .unwrap()
+                .join(String::from_utf8(entry.path.to_vec()).unwrap());
+            let content = std::fs::read(&file_path).expect("Failed to read file for blob creation");
+            repo.blob(&content).unwrap();
+        }
+
+        // Write the index to disk
+        index.write().unwrap();
+        let _tree_oid = index.write_tree().unwrap();
+
+        let git_rust_objects_folder = path.join(".git_rust/objects");
+        let git_objects_folder = path.join(".git/objects");
+
+        // Delete /pack and /info
+        assert!(git_objects_folder.join("info").exists());
+        std::fs::remove_dir(git_objects_folder.join("info")).unwrap();
+        assert!(!git_objects_folder.join("info").exists());
+        std::fs::remove_dir(git_objects_folder.join("pack")).unwrap();
+
+        let mut all_rust_git_folders = git_rust_objects_folder
+            .read_dir()
+            .unwrap()
+            .map(|n| n.unwrap().file_name().into_string().unwrap())
+            .collect::<Vec<String>>();
+
+        let mut all_git_folders = git_objects_folder
+            .read_dir()
+            .unwrap()
+            .map(|n| n.unwrap().file_name().into_string().unwrap())
+            .collect::<Vec<String>>();
+
+        let git_set: HashSet<_> = all_git_folders.iter().collect();
+        let rust_set: HashSet<_> = all_rust_git_folders.iter().collect();
+
+        let _only_in_git = git_set.difference(&rust_set).collect::<Vec<_>>();
+        let _only_in_rust = rust_set.difference(&git_set).collect::<Vec<_>>();
+
+        assert_eq!(all_rust_git_folders.len(), all_git_folders.len());
+
+        all_rust_git_folders.sort_by_key(|s| u8::from_str_radix(s, 16).unwrap());
+        all_git_folders.sort_by_key(|s| u8::from_str_radix(s, 16).unwrap());
+
+        assert_eq!(all_rust_git_folders.len(), all_git_folders.len());
+        for idx in 0..all_git_folders.len() {
+            assert_eq!(all_git_folders[idx], all_rust_git_folders[idx]);
+        }
     });
 }
