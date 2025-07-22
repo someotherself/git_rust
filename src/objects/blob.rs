@@ -38,15 +38,9 @@ impl Blob {
     }
 
     // cat-file command
-    pub fn decode_object(hash: &str) -> std::io::Result<Vec<u8>> {
-        let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
-        let (folder_name, file_name) = hash.split_at(2);
-        let file_path = root_path.join(folder_name).join(file_name);
-        let file = std::fs::read(file_path)?;
-        let bytes_output = Self::de_compress(&file)?;
-
-        let null_pos = bytes_output.iter().position(|&b| b == b'\0').unwrap();
-        let content_bytes = bytes_output[null_pos + 1..].to_vec();
+    pub fn decode_object(content: Vec<u8>) -> std::io::Result<Vec<u8>> {
+        let null_pos = content.iter().position(|&b| b == b'\0').unwrap();
+        let content_bytes = content[null_pos + 1..].to_vec();
         // let contents = Blob::new_from_bytes(bytes_output)?;
         Ok(content_bytes)
     }
