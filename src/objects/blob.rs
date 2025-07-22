@@ -1,11 +1,7 @@
-use std::{
-    fmt::Display,
-    io::{Read, Write},
-    path::PathBuf,
-};
+use std::{fmt::Display, io::Write, path::PathBuf};
 
 use clap::ArgMatches;
-use flate2::{Compress, Compression, bufread::ZlibDecoder, write::ZlibEncoder};
+use flate2::{Compress, Compression, write::ZlibEncoder};
 use hex::ToHex;
 use sha1::{Digest, Sha1};
 

@@ -10,7 +10,7 @@ use git2::IndexAddOption;
 use crate::{
     git_rust::{self, BASE_DIR},
     index::Index,
-    objects::{blob, tree::Tree},
+    objects::{self, blob, tree::Tree},
     test_common::{run_test, run_test_matches},
 };
 

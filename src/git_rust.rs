@@ -1,7 +1,7 @@
 use clap::ArgMatches;
 use std::{
     fs,
-    io::{Error, Write},
+    io::Error,
     path::{Component, Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -9,7 +9,7 @@ use thread_local::ThreadLocal;
 
 use crate::{
     index::Index,
-    objects::{blob::Blob, tree::Tree},
+    objects::{self, blob::Blob, tree::Tree},
 };
 
 pub const BASE_DIR: &str = ".git_rust";
