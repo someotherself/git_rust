@@ -967,6 +967,68 @@ fn test_write_tree_multiple_folders_1() {
         for idx in 0..all_git_folders.len() {
             assert_eq!(all_git_folders[idx], all_rust_git_folders[idx]);
         }
+
+        let rust_objects_dir = git_rust_objects_folder;
+        let libgit_objects_dir = git_objects_folder;
+
+        let mut rust_files: Vec<String> = Vec::new();
+        let mut stack = vec![rust_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    // Collect filename relative to objects dir: foldername + filename
+                    // Example: path might be ".../.git_rust/objects/ab/cdef1234..."
+                    // so get last two components as "ab/cdef1234"
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        rust_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        let mut libgit_files: Vec<String> = Vec::new();
+        let mut stack = vec![libgit_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        libgit_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        rust_files.sort();
+        libgit_files.sort();
+
+        assert_eq!(
+            rust_files.len(),
+            libgit_files.len(),
+            "Number of git object files differ"
+        );
+        for (r, l) in rust_files.iter().zip(libgit_files.iter()) {
+            assert_eq!(r, l, "Git object filename mismatch: {} != {}", r, l);
+        }
     });
 }
 
@@ -1112,6 +1174,68 @@ fn test_write_tree_multiple_folders_2() {
         for idx in 0..all_git_folders.len() {
             assert_eq!(all_git_folders[idx], all_rust_git_folders[idx]);
         }
+
+        let rust_objects_dir = git_rust_objects_folder;
+        let libgit_objects_dir = git_objects_folder;
+
+        let mut rust_files: Vec<String> = Vec::new();
+        let mut stack = vec![rust_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    // Collect filename relative to objects dir: foldername + filename
+                    // Example: path might be ".../.git_rust/objects/ab/cdef1234..."
+                    // so get last two components as "ab/cdef1234"
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        rust_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        let mut libgit_files: Vec<String> = Vec::new();
+        let mut stack = vec![libgit_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        libgit_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        rust_files.sort();
+        libgit_files.sort();
+
+        assert_eq!(
+            rust_files.len(),
+            libgit_files.len(),
+            "Number of git object files differ"
+        );
+        for (r, l) in rust_files.iter().zip(libgit_files.iter()) {
+            assert_eq!(r, l, "Git object filename mismatch: {} != {}", r, l);
+        }
     });
 }
 
@@ -1225,6 +1349,68 @@ fn test_write_tree_multiple_folders_3() {
         for idx in 0..all_git_folders.len() {
             assert_eq!(all_git_folders[idx], all_rust_git_folders[idx]);
         }
+
+        let rust_objects_dir = git_rust_objects_folder;
+        let libgit_objects_dir = git_objects_folder;
+
+        let mut rust_files: Vec<String> = Vec::new();
+        let mut stack = vec![rust_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    // Collect filename relative to objects dir: foldername + filename
+                    // Example: path might be ".../.git_rust/objects/ab/cdef1234..."
+                    // so get last two components as "ab/cdef1234"
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        rust_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        let mut libgit_files: Vec<String> = Vec::new();
+        let mut stack = vec![libgit_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        libgit_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        rust_files.sort();
+        libgit_files.sort();
+
+        assert_eq!(
+            rust_files.len(),
+            libgit_files.len(),
+            "Number of git object files differ"
+        );
+        for (r, l) in rust_files.iter().zip(libgit_files.iter()) {
+            assert_eq!(r, l, "Git object filename mismatch: {} != {}", r, l);
+        }
     });
 }
 
@@ -1332,6 +1518,68 @@ fn test_write_tree_multiple_folders_4() {
         assert_eq!(all_rust_git_folders.len(), all_git_folders.len());
         for idx in 0..all_git_folders.len() {
             assert_eq!(all_git_folders[idx], all_rust_git_folders[idx]);
+        }
+
+        let rust_objects_dir = git_rust_objects_folder;
+        let libgit_objects_dir = git_objects_folder;
+
+        let mut rust_files: Vec<String> = Vec::new();
+        let mut stack = vec![rust_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    // Collect filename relative to objects dir: foldername + filename
+                    // Example: path might be ".../.git_rust/objects/ab/cdef1234..."
+                    // so get last two components as "ab/cdef1234"
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        rust_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        let mut libgit_files: Vec<String> = Vec::new();
+        let mut stack = vec![libgit_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        libgit_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        rust_files.sort();
+        libgit_files.sort();
+
+        assert_eq!(
+            rust_files.len(),
+            libgit_files.len(),
+            "Number of git object files differ"
+        );
+        for (r, l) in rust_files.iter().zip(libgit_files.iter()) {
+            assert_eq!(r, l, "Git object filename mismatch: {} != {}", r, l);
         }
     });
 }
@@ -1442,6 +1690,68 @@ fn test_write_tree_multiple_folders_5() {
         for idx in 0..all_git_folders.len() {
             assert_eq!(all_git_folders[idx], all_rust_git_folders[idx]);
         }
+
+        let rust_objects_dir = git_rust_objects_folder;
+        let libgit_objects_dir = git_objects_folder;
+
+        let mut rust_files: Vec<String> = Vec::new();
+        let mut stack = vec![rust_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    // Collect filename relative to objects dir: foldername + filename
+                    // Example: path might be ".../.git_rust/objects/ab/cdef1234..."
+                    // so get last two components as "ab/cdef1234"
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        rust_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        let mut libgit_files: Vec<String> = Vec::new();
+        let mut stack = vec![libgit_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        libgit_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        rust_files.sort();
+        libgit_files.sort();
+
+        assert_eq!(
+            rust_files.len(),
+            libgit_files.len(),
+            "Number of git object files differ"
+        );
+        for (r, l) in rust_files.iter().zip(libgit_files.iter()) {
+            assert_eq!(r, l, "Git object filename mismatch: {} != {}", r, l);
+        }
     });
 }
 
@@ -1546,6 +1856,68 @@ fn test_write_tree_multiple_folders_6() {
         for idx in 0..all_git_folders.len() {
             assert_eq!(all_git_folders[idx], all_rust_git_folders[idx]);
         }
+
+        let rust_objects_dir = git_rust_objects_folder;
+        let libgit_objects_dir = git_objects_folder;
+
+        let mut rust_files: Vec<String> = Vec::new();
+        let mut stack = vec![rust_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    // Collect filename relative to objects dir: foldername + filename
+                    // Example: path might be ".../.git_rust/objects/ab/cdef1234..."
+                    // so get last two components as "ab/cdef1234"
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        rust_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        let mut libgit_files: Vec<String> = Vec::new();
+        let mut stack = vec![libgit_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        libgit_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        rust_files.sort();
+        libgit_files.sort();
+
+        assert_eq!(
+            rust_files.len(),
+            libgit_files.len(),
+            "Number of git object files differ"
+        );
+        for (r, l) in rust_files.iter().zip(libgit_files.iter()) {
+            assert_eq!(r, l, "Git object filename mismatch: {} != {}", r, l);
+        }
     });
 }
 
@@ -1647,6 +2019,129 @@ fn test_write_tree_multiple_folders_7() {
         for idx in 0..all_git_folders.len() {
             assert_eq!(all_git_folders[idx], all_rust_git_folders[idx]);
         }
+
+        let rust_objects_dir = git_rust_objects_folder;
+        let libgit_objects_dir = git_objects_folder;
+
+        let mut rust_files: Vec<String> = Vec::new();
+        let mut stack = vec![rust_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    // Collect filename relative to objects dir: foldername + filename
+                    // Example: path might be ".../.git_rust/objects/ab/cdef1234..."
+                    // so get last two components as "ab/cdef1234"
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        rust_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        let mut libgit_files: Vec<String> = Vec::new();
+        let mut stack = vec![libgit_objects_dir.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    let components = path.components().rev().take(2).collect::<Vec<_>>();
+                    if components.len() == 2 {
+                        let file_name = format!(
+                            "{}/{}",
+                            components[1].as_os_str().to_string_lossy(),
+                            components[0].as_os_str().to_string_lossy()
+                        );
+                        libgit_files.push(file_name);
+                    }
+                }
+            }
+        }
+
+        rust_files.sort();
+        libgit_files.sort();
+
+        assert_eq!(
+            rust_files.len(),
+            libgit_files.len(),
+            "Number of git object files differ"
+        );
+        for (r, l) in rust_files.iter().zip(libgit_files.iter()) {
+            assert_eq!(r, l, "Git object filename mismatch: {} != {}", r, l);
+        }
+
+        // TODO: Why does this fail?
+        // use flate2::read::ZlibDecoder;
+        // use sha1::{Digest, Sha1};
+        // use std::read;
+        // let rust_objects_dir = git_rust_objects_folder;
+        // let libgit_objects_dir = git_objects_folder;
+
+        // let mut rust_hashes: Vec<String> = Vec::new();
+        // let mut stack = vec![rust_objects_dir.clone()];
+        // while let Some(dir) = stack.pop() {
+        //     for entry in std::fs::read_dir(&dir).unwrap() {
+        //         let entry = entry.unwrap();
+        //         let path = entry.path();
+        //         if path.is_dir() {
+        //             stack.push(path);
+        //         } else {
+        //             let file = std::fs::File::open(&path).unwrap();
+        //             let mut z = ZlibDecoder::new(file);
+        //             let mut decompressed = Vec::new();
+        //             z.read_to_end(&mut decompressed).unwrap();
+
+        //             let mut hasher = Sha1::new();
+        //             hasher.update(&decompressed);
+        //             rust_hashes.push(format!("{:x}", hasher.finalize()));
+        //         }
+        //     }
+        // }
+
+        // let mut libgit_hashes: Vec<String> = Vec::new();
+        // let mut stack = vec![libgit_objects_dir.clone()];
+        // while let Some(dir) = stack.pop() {
+        //     for entry in std::fs::read_dir(&dir).unwrap() {
+        //         let entry = entry.unwrap();
+        //         let path = entry.path();
+        //         if path.is_dir() {
+        //             stack.push(path);
+        //         } else {
+        //             let file = std::fs::File::open(&path).unwrap();
+        //             let mut z = ZlibDecoder::new(file);
+        //             let mut decompressed = Vec::new();
+        //             z.read_to_end(&mut decompressed).unwrap();
+
+        //             let mut hasher = Sha1::new();
+        //             hasher.update(&decompressed);
+        //             libgit_hashes.push(format!("{:x}", hasher.finalize()));
+        //         }
+        //     }
+        // }
+
+        // rust_hashes.sort();
+        // libgit_hashes.sort();
+
+        // assert_eq!(
+        //     rust_hashes.len(),
+        //     libgit_hashes.len(),
+        //     "Number of git objects differ"
+        // );
+        // for (r, l) in rust_hashes.iter().zip(libgit_hashes.iter()) {
+        //     assert_eq!(r, l, "Object hash mismatch: {} != {}", r, l);
+        // }
     });
 }
 
