@@ -42,8 +42,15 @@ impl Header {
             .ok_or_else(|| std::io::Error::other("Missing size field"))?
             .parse()
             .map_err(|_| std::io::Error::other("Missing size field"))?;
+        
+        let object_type = match vec[0] {
+            "blob" => ObjectType::Blob,
+            "tree" => ObjectType::Tree,
+            "commit" => ObjectType::Commit,
+            _ => {return Err(std::io::Error::other("Invalid object type"))},
+        };
         Ok(Self {
-            object: ObjectType::Tree,
+            object: object_type,
             size,
         })
     }
