@@ -55,16 +55,41 @@ fn main() -> std::io::Result<()> {
         )
         // git write-tree
         .subcommand(Command::new("write-tree").about("Create a tree object from the current index"))
+        .subcommand(
+            Command::new("commit-tree")
+                .about("Create a new commit object")
+                .arg(
+                    Arg::new("hash")
+                        .required(true)
+                        .value_name("HASH")
+                        .help("The tree object hash to commit"),
+                )
+                .arg(
+                    Arg::new("commit")
+                        .short('p')
+                        .value_name("COMMIT")
+                        .help("Optional parent commit hash (for non-root commits)"),
+                )
+                .arg(
+                    Arg::new("message")
+                        .short('m')
+                        .value_name("MESSAGE")
+                        .help("Commit message (if not provided, reads from stdin)"),
+                ),
+        )
         .get_matches();
 
     match matches.subcommand() {
         Some(("init", _)) => RepoRust::init()?,
-        Some(("cat-file", args)) => RepoRust::cat_file(args)?,
+        Some(("cat-file", args)) => {
+            RepoRust::cat_file(args)?;
+        }
         Some(("hash-object", args)) => RepoRust::hash_object(args)?,
         Some(("ls-tree", args)) => RepoRust::ls_tree(args)?,
         Some(("add", args)) => RepoRust::add(args)?,
         Some(("ls-files", args)) => RepoRust::ls_files(args)?,
         Some(("write-tree", args)) => RepoRust::write_tree(args)?,
+        Some(("commit-tree", args)) => RepoRust::commit_tree(args)?,
         Some((_, _)) | None => {}
     }
     Ok(())

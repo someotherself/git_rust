@@ -148,15 +148,13 @@ impl RepoRust {
         Ok(())
     }
 
-    pub fn cat_file(args: &ArgMatches) -> std::io::Result<()> {
+    pub fn cat_file(args: &ArgMatches) -> std::io::Result<Vec<u8>> {
         let _sub_arg = args.get_flag("pretty");
-        let hash = args.get_one::<String>("hash").expect("Hash is required.");
+        let hash = args.get_one::<String>("hash").unwrap();
         // Contents without the header
         // TODO Get the blob and display contents based on object type
         // let blob = Blob::from_hash(hash.clone())?;
-        let contents = Blob::decode_object(hash)?;
-        std::io::stdout().write_all(&contents)?;
-        Ok(())
+        objects::cat_file(hash)
     }
 
     pub fn hash_object(args: &ArgMatches) -> std::io::Result<()> {
@@ -172,10 +170,7 @@ impl RepoRust {
     }
 
     pub fn add(args: &ArgMatches) -> std::io::Result<()> {
-        let path = args
-            .get_one::<String>("path")
-            .expect("File is required.")
-            .to_owned();
+        let path = args.get_one::<String>("path").unwrap().to_owned();
         Self::check_paths(path.clone())?;
         Index::build_index(path)?;
         Ok(())
@@ -191,6 +186,16 @@ impl RepoRust {
 
     pub fn write_tree(_args: &ArgMatches) -> std::io::Result<()> {
         Tree::encode_object()?;
+        Ok(())
+    }
+
+    pub fn commit_tree(args: &ArgMatches) -> std::io::Result<()> {
+        let hash = args.get_one::<String>("hash").unwrap().to_owned();
+        let commit = args.get_one::<String>("commit").unwrap().to_owned();
+        let message = args.get_one::<String>("message").unwrap().to_owned();
+        println!("{hash}");
+        println!("{commit}");
+        println!("{message}");
         Ok(())
     }
 }
