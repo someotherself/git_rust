@@ -70,6 +70,42 @@ impl Header {
     }
 }
 
+pub fn cat_file(hash: &str) -> std::io::Result<Vec<u8>> {
+    let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
+    let (folder_name, file_name) = hash.split_at(2);
+    let file_path = root_path.join(folder_name).join(file_name);
+    dbg!(&file_path);
+    let file = std::fs::read(file_path)?;
+    let de_compressed_file = de_compress(&file)?;
+
+    let header = Header::from_binary(&de_compressed_file)?;
+    let content: Vec<u8>;
+    match header.object {
+        ObjectType::Blob => {
+            content = Blob::decode_object(de_compressed_file)?;
+            std::io::stdout().write_all(&content)?;
+        }
+        ObjectType::Tree => {
+            dbg!("is a tree");
+            content = Blob::decode_object(de_compressed_file)?;
+            // Tree::decode_object(de_compressed_file);
+        }
+        ObjectType::Commit => {
+            dbg!("is a commit");
+            content = Blob::decode_object(de_compressed_file)?;
+            // Commit::decode_object(de_compressed_file);
+        }
+    }
+    Ok(content)
+}
+
+pub fn de_compress(content: &[u8]) -> std::io::Result<Vec<u8>> {
+    let mut decompressed = ZlibDecoder::new(content);
+    let mut buffer = Vec::new();
+    decompressed.read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
+
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> core::fmt::Result {
         match *self {
