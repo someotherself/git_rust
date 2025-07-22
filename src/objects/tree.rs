@@ -37,49 +37,6 @@ impl Tree {
         let index = Index::read_index()?;
         let entries_by_folder = Self::group_entries_for_tree_build(index.entries);
         let trees = Self::build_trees(entries_by_folder);
-
-        // DEBUG ONLY
-        // for idx in 0..trees.len() {
-        //     let tree = &trees[idx];
-        //     let hash = hex::encode(tree.hash);
-        //     println!("\nTree #{} Hash: {}\n------------------", idx, hash);
-
-        //     let mut content_bytes = Vec::new();
-
-        //     for entry in &tree.entries {
-        //         let mode_str = match entry.object_type {
-        //             ObjectType::Blob => "100644",
-        //             ObjectType::Tree => "40000",
-        //             _ => continue,
-        //         };
-
-        //         let mut entry_bytes = Vec::new();
-        //         entry_bytes.extend_from_slice(mode_str.as_bytes());
-        //         entry_bytes.push(b' ');
-        //         entry_bytes.extend_from_slice(entry.name.as_bytes());
-        //         entry_bytes.push(0);
-        //         entry_bytes.extend_from_slice(&entry.hash);
-
-        //         println!("Entry:");
-        //         println!("  Mode : {}", mode_str);
-        //         println!("  Name : {}", entry.name);
-        //         println!("  Hash : {}", hex::encode(&entry.hash));
-        //         println!("  Bytes: {:?}", entry_bytes);
-
-        //         content_bytes.extend_from_slice(&entry_bytes);
-        //     }
-
-        //     let header = format!("tree {}\0", content_bytes.len());
-        //     println!("Header: {:?}", header.as_bytes());
-        //     println!("Full Content: {:?}", content_bytes);
-
-        //     let mut hasher = Sha1::new();
-        //     hasher.update(&header.as_bytes());
-        //     hasher.update(&content_bytes);
-        //     let computed_hash = hasher.finalize();
-        //     println!("Computed SHA1: {}", hex::encode(computed_hash));
-        // }
-
         Self::write_object_to_file(trees)?;
         Ok(())
     }
