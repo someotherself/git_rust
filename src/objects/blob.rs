@@ -118,13 +118,6 @@ impl Blob {
         }
     }
 
-    pub fn de_compress(content: &[u8]) -> std::io::Result<Vec<u8>> {
-        let mut decompressed = ZlibDecoder::new(content);
-        let mut buffer = Vec::new();
-        decompressed.read_to_end(&mut buffer)?;
-        Ok(buffer)
-    }
-
     pub fn blob_exists(hash: [u8; 20]) -> bool {
         let root = &RepoRust::get_root().absolute_path;
         let obj_path = RepoRust::get_object_folder(root);

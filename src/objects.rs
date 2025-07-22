@@ -7,7 +7,10 @@ use std::{
 
 use flate2::bufread::ZlibDecoder;
 
-use crate::{git_rust::RepoRust, objects::blob::Blob};
+use crate::{
+    git_rust::RepoRust,
+    objects::{blob::Blob, tree::Tree},
+};
 
 pub mod blob;
 pub mod commit;
@@ -49,12 +52,12 @@ impl Header {
             .ok_or_else(|| std::io::Error::other("Missing size field"))?
             .parse()
             .map_err(|_| std::io::Error::other("Missing size field"))?;
-        
+
         let object_type = match vec[0] {
             "blob" => ObjectType::Blob,
             "tree" => ObjectType::Tree,
             "commit" => ObjectType::Commit,
-            _ => {return Err(std::io::Error::other("Invalid object type"))},
+            _ => return Err(std::io::Error::other("Invalid object type")),
         };
         Ok(Self {
             object: object_type,
@@ -62,6 +65,7 @@ impl Header {
         })
     }
 
+    // TODO: size must be bytes, not number of entries
     pub fn from_tree_entries(entries: usize) -> Self {
         Self {
             object: ObjectType::Tree,
@@ -70,6 +74,7 @@ impl Header {
     }
 }
 
+#[allow(unreachable_code)]
 pub fn cat_file(hash: &str) -> std::io::Result<Vec<u8>> {
     let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
     let (folder_name, file_name) = hash.split_at(2);
@@ -81,19 +86,17 @@ pub fn cat_file(hash: &str) -> std::io::Result<Vec<u8>> {
     let header = Header::from_binary(&de_compressed_file)?;
     let content: Vec<u8>;
     match header.object {
+        // -p not implemented.
         ObjectType::Blob => {
             content = Blob::decode_object(de_compressed_file)?;
             std::io::stdout().write_all(&content)?;
         }
         ObjectType::Tree => {
-            dbg!("is a tree");
-            content = Blob::decode_object(de_compressed_file)?;
-            // Tree::decode_object(de_compressed_file);
+            content = Tree::de_compress(&file)?;
+            std::io::stdout().write_all(&content)?;
         }
         ObjectType::Commit => {
-            dbg!("is a commit");
-            content = Blob::decode_object(de_compressed_file)?;
-            // Commit::decode_object(de_compressed_file);
+            todo!()
         }
     }
     Ok(content)

@@ -164,7 +164,11 @@ impl RepoRust {
     }
 
     pub fn ls_tree(args: &ArgMatches) -> std::io::Result<()> {
-        let tree = Tree::decode_object(args)?;
+        let hash_str = args
+            .get_one::<String>("hash")
+            .expect("Object is required.")
+            .to_owned();
+        let tree = Tree::decode_object(hash_str)?;
         println!("{tree}");
         Ok(())
     }

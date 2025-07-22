@@ -1,10 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Display;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use clap::ArgMatches;
-use flate2::bufread::ZlibDecoder;
 use flate2::{Compress, Compression, write::ZlibEncoder};
 use hex::ToHex;
 use sha1::{Digest, Sha1};
@@ -37,26 +35,21 @@ impl Tree {
         let index = Index::read_index()?;
         let entries_by_folder = Self::group_entries_for_tree_build(index.entries);
         let trees = Self::build_trees(entries_by_folder);
-        Self::write_object_to_file(trees)?;
+        Self::write_object_to_file(trees.0)?;
+        let hash = hex::encode(trees.1);
+        println!("{hash}");
         Ok(())
     }
 
     // ls-tree
-    pub fn decode_object(args: &ArgMatches) -> std::io::Result<Self> {
+    pub fn decode_object(hash_str: String) -> std::io::Result<Self> {
         let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
-
-        let hash_str = args
-            .get_one::<String>("hash")
-            .expect("Object is required.")
-            .to_owned();
-
         let hash_vec = hex::decode(&hash_str).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 format!("Invalid SHA1: {e}"),
             )
         })?;
-
         let hash: [u8; 20] = hash_vec.try_into().map_err(|_| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "SHA1 must be 20 bytes")
         })?;
@@ -67,7 +60,6 @@ impl Tree {
 
         let bytes_output = Self::de_compress(&file_content)?;
         let header = Header::from_binary(&bytes_output)?;
-
         let entries = Self::get_tree_entries(&bytes_output, &header);
 
         let tree = Self {
@@ -101,12 +93,16 @@ impl Tree {
             content.extend_from_slice(header.as_bytes());
 
             for entry in tree.entries {
-                let mode = entry.mode;
+                let mode = match entry.object_type {
+                    ObjectType::Blob => "100644",
+                    ObjectType::Tree => "40000",
+                    ObjectType::Commit => "160000",
+                };
                 let tree_name = entry.name;
                 content.extend_from_slice(mode.as_bytes());
-                content.extend_from_slice(b" ");
+                content.push(b' ');
                 content.extend_from_slice(tree_name.as_bytes());
-                content.extend_from_slice(b"\0");
+                content.push(0);
                 content.extend_from_slice(&entry.hash);
             }
             enc.write_all(&content)?;
@@ -129,7 +125,14 @@ impl Tree {
                 name_cmp
             }
         });
-        let header = Header::from_tree_entries(entries.len());
+        let size: usize = entries
+            .iter()
+            .map(|entry| entry.mode.len() + 1 + entry.name.len() + 1 + 20)
+            .sum();
+        let header = Header {
+            object: ObjectType::Tree,
+            size,
+        };
         let hash = Self::sha1_tree(&entries);
         Self {
             header,
@@ -152,7 +155,7 @@ impl Tree {
             content.extend_from_slice(mode_str.as_bytes());
             content.push(b' ');
             content.extend_from_slice(tree_entry.name.as_bytes());
-            content.push(b'\0');
+            content.push(0);
             content.extend_from_slice(&tree_entry.hash);
         }
         let header = format!("tree {}\0", content.len());
@@ -163,10 +166,16 @@ impl Tree {
 
     // Decompresses the contents of a tree to be read/displayed
     pub fn de_compress(content: &[u8]) -> std::io::Result<Vec<u8>> {
-        let mut buffer = vec![0; 1024];
-        let mut decompressed = ZlibDecoder::new(content);
-        decompressed.read_exact(&mut buffer)?;
-        Ok(buffer)
+        // let mut buffer = vec![0; 1024];
+        // let mut decompressed = flate2::bufread::ZlibDecoder::new(content);
+        // decompressed.read_to_end(&mut buffer)?;
+        // Ok(buffer)
+        use std::io::Read;
+        let mut decompressed = Vec::new();
+        let cursor = std::io::Cursor::new(content);
+        let mut decoder = flate2::bufread::ZlibDecoder::new(cursor);
+        decoder.read_to_end(&mut decompressed)?;
+        Ok(decompressed)
     }
 
     // Parses the contents of a tree objects into a Vec of TreeEntries
@@ -190,6 +199,7 @@ impl Tree {
             match mode.as_str() {
                 "100644" => objecttype = ObjectType::Blob,
                 "040000" | "40000" => objecttype = ObjectType::Tree,
+                "160000" => objecttype = ObjectType::Commit,
                 _ => {
                     panic!("Invalid object type.")
                 }
@@ -244,7 +254,7 @@ impl Tree {
 
     pub fn build_trees(
         entries_by_folder: BTreeMap<String, Vec<(PathBuf, IndexEntry)>>,
-    ) -> Vec<Self> {
+    ) -> (Vec<Self>, [u8; 20]) {
         // Create a hash table of all the folders and trees
         // Create and update trees and write to file at the end
         let mut tree_list: HashMap<PathBuf, Self> = HashMap::new();
@@ -318,7 +328,11 @@ impl Tree {
                 current_path.pop();
             }
         }
-        tree_list.into_values().collect::<Vec<Self>>()
+        let root_tree = tree_list
+            .get(&PathBuf::from(""))
+            .expect("Root tree hash missing")
+            .hash;
+        (tree_list.into_values().collect::<Vec<Self>>(), root_tree)
     }
 }
 
