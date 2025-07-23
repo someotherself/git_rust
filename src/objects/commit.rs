@@ -23,7 +23,7 @@ pub struct Autors {
 }
 
 impl Autors {
-    pub fn from_butes(bytes: &[u8]) -> Option<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         let string = str::from_utf8(bytes).ok()?;
         let mut components = string.split(' ');
         let authors = components.next()?;
@@ -188,7 +188,7 @@ impl Commit {
                 let parent_hash = str::from_utf8(hash_bytes).unwrap().to_string();
                 parents_hash.push(parent_hash);
             } else if line.starts_with(b"author ") {
-                match Autors::from_butes(line) {
+                match Autors::from_bytes(line) {
                     Some(a) => author = a,
                     // Should not be able to create a commit without author
                     None => {
@@ -196,7 +196,7 @@ impl Commit {
                     }
                 }
             } else if line.starts_with(b"committer ") {
-                match Autors::from_butes(line) {
+                match Autors::from_bytes(line) {
                     Some(a) => committer = a,
                     // Should not be able to create a commit without committer
                     None => {
