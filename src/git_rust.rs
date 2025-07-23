@@ -200,7 +200,8 @@ impl RepoRust {
             .get_one::<String>("message")
             .unwrap_or(&"".into())
             .to_owned();
-        Commit::encode(hash, commit.clone(), message)?;
+        let commit = Commit::encode(hash, commit.clone(), message)?;
+        commit.write_commit_to_file()?;
         Ok(())
     }
 }

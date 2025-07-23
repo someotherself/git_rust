@@ -1,4 +1,9 @@
+use std::io::Write;
+
 use chrono::Local;
+use flate2::{Compress, Compression, write::ZlibEncoder};
+use hex::ToHex;
+use sha1::{Digest, Sha1};
 
 use crate::{
     git_rust::RepoRust,
@@ -231,6 +236,43 @@ impl Commit {
             committer,
             message,
         })
+    }
+
+    #[allow(unused_variables)]
+    pub fn write_commit_to_file(&self) -> std::io::Result<()> {
+        let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
+
+        let header = format!("commit {}\0", self.header.size);
+        let commit_bytes = &self.to_bytes();
+
+        let hash = Self::sha1_tree(commit_bytes);
+        let (folder_name, file_name) = hash.split_at(2);
+        let folder_path = objects_path.join(folder_name);
+        let file_path = folder_path.join(file_name);
+        if !folder_path.exists() {
+            std::fs::create_dir(folder_path)?;
+        }
+        let new_commit = std::fs::File::create(file_path)?;
+
+        let mut content: Vec<u8> = Vec::new();
+        // Create the compression encoder
+        let mut enc =
+            ZlibEncoder::new_with_compress(new_commit, Compress::new(Compression::best(), true));
+
+        content.extend_from_slice(header.as_bytes());
+        content.extend_from_slice(commit_bytes);
+        enc.write_all(&content)?;
+        enc.finish()?;
+
+        Ok(())
+    }
+
+    pub fn sha1_tree(content: &[u8]) -> String {
+        let mut hasher = Sha1::new();
+        hasher.update(format!("commit {}\0", content.len()).as_bytes());
+        hasher.update(content);
+        let result = hasher.finalize();
+        result.encode_hex::<String>()
     }
 }
 
