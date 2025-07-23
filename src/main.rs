@@ -68,12 +68,14 @@ fn main() -> std::io::Result<()> {
                     Arg::new("commit")
                         .short('p')
                         .value_name("COMMIT")
+                        .action(clap::ArgAction::Append)
                         .help("Optional parent commit hash (for non-root commits)"),
                 )
                 .arg(
                     Arg::new("message")
                         .short('m')
                         .value_name("MESSAGE")
+                        .default_value("")
                         .help("Commit message (if not provided, reads from stdin)"),
                 ),
         )

@@ -1,3 +1,5 @@
+use chrono::Local;
+
 use crate::{
     git_rust::RepoRust,
     objects::{self, Header},
@@ -16,7 +18,7 @@ pub struct Commit {
 pub struct Autors {
     name: String,
     email: String,
-    date: i64,
+    timestamp: i64,
     timezone: String,
 }
 
@@ -36,21 +38,113 @@ impl Autors {
         let email_end = email_field.find('>')?;
         let email = email_field[email_start..email_end].to_string();
 
-        let date: i64 = components.next()?.parse().ok()?;
+        let timestamp: i64 = components.next()?.parse().ok()?;
         let timezone = components.next()?.to_string();
 
         Some(Autors {
             name,
             email,
-            date,
+            timestamp,
             timezone,
         })
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut contents: Vec<u8> = Vec::new();
+        contents.extend_from_slice(self.name.as_bytes());
+        contents.push(b' ');
+        contents.push(b'<');
+        contents.extend_from_slice(self.email.as_bytes());
+        contents.push(b'>');
+        contents.push(b' ');
+        contents.extend_from_slice(self.timestamp.to_string().as_bytes());
+        contents.push(b' ');
+        contents.extend_from_slice(self.timezone.as_bytes());
+        contents
     }
 }
 
 impl Commit {
     fn header(&self) -> &Header {
         &self.header
+    }
+
+    pub fn encode(
+        tree_hash: String,
+        commit: Vec<String>,
+        message: String,
+    ) -> std::io::Result<Self> {
+        // Check if the tree is valid
+        objects::get_object_path(&tree_hash).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "Tree object not found")
+        })?;
+
+        // Check if the parents are valid
+        if !commit.is_empty() {
+            for hash in &commit {
+                objects::get_object_path(hash).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "Commit object not found")
+                })?;
+            }
+        }
+
+        let now = Local::now();
+        let timestamp = now.timestamp();
+        let offset = now.offset().utc_minus_local();
+        let hours = offset / 3600;
+        let minutes = (offset.abs() % 3600) / 60;
+        let sign = if offset >= 0 { '-' } else { '+' };
+        let timezone = format!("{}{:<02}{:02}", sign, hours.abs(), minutes);
+
+        let git2_repo = git2::Repository::discover(".").expect("Could not find .git repo");
+        let config = git2_repo.config().expect("Could not fetch git config");
+        let name = config
+            .get_string("user.name")
+            .expect("Could not fetch git name");
+        let email = config
+            .get_string("user.email")
+            .expect("Could not fetch git email");
+
+        let author = Autors {
+            name: name.clone(),
+            email: email.clone(),
+            timestamp,
+            timezone: timezone.clone(),
+        };
+        let committer = Autors {
+            name,
+            email,
+            timestamp,
+            timezone,
+        };
+
+        let mut contents: Vec<u8> = vec![];
+        contents.extend_from_slice("tree ".as_bytes());
+        contents.extend_from_slice(tree_hash.as_bytes());
+        contents.push(b'\n');
+        if !commit.is_empty() {
+            for hash in &commit {
+                contents.extend_from_slice("parent ".as_bytes());
+                contents.extend_from_slice(hash.as_bytes());
+                contents.push(b'\n');
+            }
+        }
+        contents.extend_from_slice(&author.to_bytes());
+        contents.push(b'\n');
+        contents.extend_from_slice(&committer.to_bytes());
+        contents.push(b'\n');
+        contents.push(b'\n');
+        contents.extend_from_slice(message.as_bytes());
+
+        let header = Header::from_binary(&contents)?;
+        Ok(Self {
+            header,
+            tree_hash,
+            parents_hash: commit,
+            author,
+            committer,
+            message,
+        })
     }
 
     // Split by new line. Each line starts with these words (as bytes):
@@ -62,7 +156,6 @@ impl Commit {
     // \n
     // <commit message>
     // Used by cat-file
-    pub fn encode() {}
     pub fn decode(hash: &str) -> std::io::Result<Self> {
         let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
 
@@ -131,7 +224,7 @@ impl std::fmt::Display for Autors {
         write!(
             f,
             "{} <{}> {} {}",
-            self.name, self.email, self.date, self.timezone
+            self.name, self.email, self.timestamp, self.timezone
         )
     }
 }

@@ -9,7 +9,7 @@ use thread_local::ThreadLocal;
 
 use crate::{
     index::Index,
-    objects::{self, blob::Blob, tree::Tree},
+    objects::{self, blob::Blob, commit::Commit, tree::Tree},
 };
 
 pub const BASE_DIR: &str = ".git_rust";
@@ -136,7 +136,6 @@ impl RepoRust {
     pub fn init() -> std::io::Result<()> {
         let root = Self::get_root();
         let head = root.absolute_path.join(BASE_DIR).join("HEAD");
-        dbg!(&head);
         if head.try_exists()? {
             return Err(Error::other("Git already initialized!"));
         }
@@ -151,9 +150,6 @@ impl RepoRust {
     pub fn cat_file(args: &ArgMatches) -> std::io::Result<Vec<u8>> {
         let _sub_arg = args.get_flag("pretty");
         let hash = args.get_one::<String>("hash").unwrap();
-        // Contents without the header
-        // TODO Get the blob and display contents based on object type
-        // let blob = Blob::from_hash(hash.clone())?;
         objects::cat_file(hash)
     }
 
@@ -195,11 +191,16 @@ impl RepoRust {
 
     pub fn commit_tree(args: &ArgMatches) -> std::io::Result<()> {
         let hash = args.get_one::<String>("hash").unwrap().to_owned();
-        let commit = args.get_one::<String>("commit").unwrap().to_owned();
-        let message = args.get_one::<String>("message").unwrap().to_owned();
-        println!("{hash}");
-        println!("{commit}");
-        println!("{message}");
+        let commit = args
+            .get_many::<String>("commit")
+            .unwrap_or_default()
+            .cloned()
+            .collect::<Vec<_>>();
+        let message = args
+            .get_one::<String>("message")
+            .unwrap_or(&"".into())
+            .to_owned();
+        Commit::encode(hash, commit.clone(), message)?;
         Ok(())
     }
 }

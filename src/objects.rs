@@ -3,6 +3,7 @@
 use std::{
     fmt::Display,
     io::{Read, Write},
+    path::PathBuf,
 };
 
 use crate::{
@@ -72,12 +73,10 @@ impl Header {
     }
 }
 
-#[allow(unreachable_code)]
 pub fn cat_file(hash: &str) -> std::io::Result<Vec<u8>> {
     let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
     let (folder_name, file_name) = hash.split_at(2);
     let file_path = root_path.join(folder_name).join(file_name);
-    dbg!(&file_path);
     let file = std::fs::read(file_path)?;
     let de_compressed_file = de_compress(&file)?;
 
@@ -107,6 +106,17 @@ pub fn de_compress(content: &[u8]) -> std::io::Result<Vec<u8>> {
     let mut decoder = flate2::bufread::ZlibDecoder::new(cursor);
     decoder.read_to_end(&mut decompressed)?;
     Ok(decompressed)
+}
+
+pub fn get_object_path(hash: &str) -> Option<PathBuf> {
+    let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
+    let (folder_name, file_name) = hash.split_at(2);
+    let file_path = root_path.join(folder_name).join(file_name);
+    if file_path.exists() {
+        Some(file_path)
+    } else {
+        None
+    }
 }
 
 impl Display for ObjectType {
