@@ -166,10 +166,6 @@ impl Tree {
 
     // Decompresses the contents of a tree to be read/displayed
     pub fn de_compress(content: &[u8]) -> std::io::Result<Vec<u8>> {
-        // let mut buffer = vec![0; 1024];
-        // let mut decompressed = flate2::bufread::ZlibDecoder::new(content);
-        // decompressed.read_to_end(&mut buffer)?;
-        // Ok(buffer)
         use std::io::Read;
         let mut decompressed = Vec::new();
         let cursor = std::io::Cursor::new(content);
@@ -198,7 +194,7 @@ impl Tree {
             let objecttype: ObjectType;
             match mode.as_str() {
                 "100644" => objecttype = ObjectType::Blob,
-                "040000" | "40000" => objecttype = ObjectType::Tree,
+                "40000" => objecttype = ObjectType::Tree,
                 "160000" => objecttype = ObjectType::Commit,
                 _ => {
                     panic!("Invalid object type.")

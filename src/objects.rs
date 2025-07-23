@@ -5,11 +5,9 @@ use std::{
     io::{Read, Write},
 };
 
-use flate2::bufread::ZlibDecoder;
-
 use crate::{
     git_rust::RepoRust,
-    objects::{blob::Blob, tree::Tree},
+    objects::{blob::Blob, commit::Commit, tree::Tree},
 };
 
 pub mod blob;
@@ -84,7 +82,7 @@ pub fn cat_file(hash: &str) -> std::io::Result<Vec<u8>> {
     let de_compressed_file = de_compress(&file)?;
 
     let header = Header::from_binary(&de_compressed_file)?;
-    let content: Vec<u8>;
+    let mut content: Vec<u8> = Vec::new();
     match header.object {
         // -p not implemented.
         ObjectType::Blob => {
@@ -96,17 +94,19 @@ pub fn cat_file(hash: &str) -> std::io::Result<Vec<u8>> {
             std::io::stdout().write_all(&content)?;
         }
         ObjectType::Commit => {
-            todo!()
+            let commit = Commit::decode(hash)?;
+            print!("{commit}");
         }
     }
     Ok(content)
 }
 
 pub fn de_compress(content: &[u8]) -> std::io::Result<Vec<u8>> {
-    let mut decompressed = ZlibDecoder::new(content);
-    let mut buffer = Vec::new();
-    decompressed.read_to_end(&mut buffer)?;
-    Ok(buffer)
+    let mut decompressed = Vec::new();
+    let cursor = std::io::Cursor::new(content);
+    let mut decoder = flate2::bufread::ZlibDecoder::new(cursor);
+    decoder.read_to_end(&mut decompressed)?;
+    Ok(decompressed)
 }
 
 impl Display for ObjectType {
