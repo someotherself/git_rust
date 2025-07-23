@@ -73,7 +73,7 @@ impl Header {
     }
 }
 
-pub fn cat_file(hash: &str) -> std::io::Result<Vec<u8>> {
+pub fn cat_file(hash: &str, pretty: bool) -> std::io::Result<Vec<u8>> {
     let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
     let (folder_name, file_name) = hash.split_at(2);
     let file_path = root_path.join(folder_name).join(file_name);
@@ -83,14 +83,19 @@ pub fn cat_file(hash: &str) -> std::io::Result<Vec<u8>> {
     let header = Header::from_binary(&de_compressed_file)?;
     let mut content: Vec<u8> = Vec::new();
     match header.object {
-        // -p not implemented.
+        // -p not implemented for all
         ObjectType::Blob => {
             content = Blob::decode_object(de_compressed_file)?;
             std::io::stdout().write_all(&content)?;
         }
         ObjectType::Tree => {
-            content = Tree::de_compress(&file)?;
-            std::io::stdout().write_all(&content)?;
+            if !pretty {
+                content = Tree::de_compress(&file)?;
+                std::io::stdout().write_all(&content)?;
+            } else {
+                let tree = Tree::decode_object(hash.to_string())?;
+                println!("{tree}");
+            }
         }
         ObjectType::Commit => {
             let commit = Commit::decode(hash)?;

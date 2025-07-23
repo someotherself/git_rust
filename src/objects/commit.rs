@@ -238,7 +238,6 @@ impl Commit {
         })
     }
 
-    #[allow(unused_variables)]
     pub fn write_commit_to_file(&self) -> std::io::Result<()> {
         let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
 
@@ -255,7 +254,6 @@ impl Commit {
         let new_commit = std::fs::File::create(file_path)?;
 
         let mut content: Vec<u8> = Vec::new();
-        // Create the compression encoder
         let mut enc =
             ZlibEncoder::new_with_compress(new_commit, Compress::new(Compression::best(), true));
 
@@ -263,7 +261,6 @@ impl Commit {
         content.extend_from_slice(commit_bytes);
         enc.write_all(&content)?;
         enc.finish()?;
-
         Ok(())
     }
 

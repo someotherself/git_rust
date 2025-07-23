@@ -148,9 +148,9 @@ impl RepoRust {
     }
 
     pub fn cat_file(args: &ArgMatches) -> std::io::Result<Vec<u8>> {
-        let _sub_arg = args.get_flag("pretty");
+        let sub_arg = args.get_flag("pretty");
         let hash = args.get_one::<String>("hash").unwrap();
-        objects::cat_file(hash)
+        objects::cat_file(hash, sub_arg)
     }
 
     pub fn hash_object(args: &ArgMatches) -> std::io::Result<()> {

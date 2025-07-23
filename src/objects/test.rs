@@ -143,7 +143,7 @@ fn test_hash_file_in_temp_folder() {
         assert_eq!(git2_hash.id().to_string(), format!("{}", git_rust_hash));
 
         // cat-file the object
-        let git_rust_content = objects::cat_file(&git_rust_hash.hash).unwrap();
+        let git_rust_content = objects::cat_file(&git_rust_hash.hash, false).unwrap();
 
         let oid = repo.find_blob(blob_oid).unwrap();
         let git2_content = oid.content();
@@ -221,7 +221,7 @@ fn test_hash_cat_raw_bytes() {
         let git_rust_hash = blob::Blob::encode_object(&args).unwrap();
 
         // cat-file the object
-        let git_rust_content = objects::cat_file(&git_rust_hash.hash).unwrap();
+        let git_rust_content = objects::cat_file(&git_rust_hash.hash, false).unwrap();
 
         assert_eq!(git_rust_content, &[0x00, 0xFF, 0xFE, 0x41, 0x42, 0x00]);
     });

@@ -47,7 +47,6 @@ impl Blob {
 
     // hash-object command
     pub fn encode_object(args: &ArgMatches) -> std::io::Result<Self> {
-        // TODO: Check if blob already exists. Add test for it.
         let sub_arg = args.get_flag("write");
         let object = args
             .get_one::<String>("file")
