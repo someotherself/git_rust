@@ -204,4 +204,8 @@ impl RepoRust {
         commit.write_commit_to_file()?;
         Ok(())
     }
+
+    pub fn commit(_args: &ArgMatches) -> std::io::Result<()> {
+        todo!()
+    }
 }

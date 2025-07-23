@@ -79,6 +79,18 @@ fn main() -> std::io::Result<()> {
                         .help("Commit message (if not provided, reads from stdin)"),
                 ),
         )
+        // commit
+        .subcommand(
+            Command::new("commit").about("Record changes to the repository")
+            .arg(
+                Arg::new("add")
+                .short('a')
+                .value_name("ADD")
+                .help("Automatically stage files that have been modified and deleted, but new files you have not told Git about are not affected."))
+            .arg(Arg::new("message")
+                .short('m')
+                .value_name("MESSAGE")
+                .help("Add a commit message.")))
         .get_matches();
 
     match matches.subcommand() {
@@ -92,6 +104,7 @@ fn main() -> std::io::Result<()> {
         Some(("ls-files", args)) => RepoRust::ls_files(args)?,
         Some(("write-tree", args)) => RepoRust::write_tree(args)?,
         Some(("commit-tree", args)) => RepoRust::commit_tree(args)?,
+        Some(("commit", args)) => RepoRust::commit(args)?,
         Some((_, _)) | None => {}
     }
     Ok(())
