@@ -69,6 +69,27 @@ impl Commit {
         &self.header
     }
 
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut contents: Vec<u8> = vec![];
+        contents.extend_from_slice("tree ".as_bytes());
+        contents.extend_from_slice(self.tree_hash.as_bytes());
+        contents.push(b'\n');
+        if !self.parents_hash.is_empty() {
+            for hash in &self.parents_hash {
+                contents.extend_from_slice("parent ".as_bytes());
+                contents.extend_from_slice(hash.as_bytes());
+                contents.push(b'\n');
+            }
+        }
+        contents.extend_from_slice(&self.author.to_bytes());
+        contents.push(b'\n');
+        contents.extend_from_slice(&self.committer.to_bytes());
+        contents.push(b'\n');
+        contents.push(b'\n');
+        contents.extend_from_slice(self.message.as_bytes());
+        contents
+    }
+
     pub fn encode(
         tree_hash: String,
         commit: Vec<String>,
@@ -118,33 +139,27 @@ impl Commit {
             timezone,
         };
 
-        let mut contents: Vec<u8> = vec![];
-        contents.extend_from_slice("tree ".as_bytes());
-        contents.extend_from_slice(tree_hash.as_bytes());
-        contents.push(b'\n');
-        if !commit.is_empty() {
-            for hash in &commit {
-                contents.extend_from_slice("parent ".as_bytes());
-                contents.extend_from_slice(hash.as_bytes());
-                contents.push(b'\n');
-            }
-        }
-        contents.extend_from_slice(&author.to_bytes());
-        contents.push(b'\n');
-        contents.extend_from_slice(&committer.to_bytes());
-        contents.push(b'\n');
-        contents.push(b'\n');
-        contents.extend_from_slice(message.as_bytes());
+        let temp_header = Header {
+            object: objects::ObjectType::Commit,
+            size: 0,
+        };
 
-        let header = Header::from_binary(&contents)?;
-        Ok(Self {
-            header,
+        let mut commit = Self {
+            header: temp_header,
             tree_hash,
             parents_hash: commit,
             author,
             committer,
             message,
-        })
+        };
+        let contents = commit.to_bytes();
+        let header = Header {
+            object: objects::ObjectType::Commit,
+            size: contents.len(),
+        };
+        commit.header = header;
+
+        Ok(commit)
     }
 
     // Split by new line. Each line starts with these words (as bytes):
