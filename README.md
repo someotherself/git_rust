@@ -48,6 +48,7 @@ This project explores how Git works under the hood — from creating repositorie
 
 ## Object files (blobs, tree and commits)
 All blob, tree and commit files are tested to be compatible with git.
+Below is meant to be as documentation. Should be matching git to the best of my research.
 
 All git object files are preceded by a header. They are all compressed with zlib.
 A header contains the name of the object, followed by the size of te content (number of bytes) and null terminated.
