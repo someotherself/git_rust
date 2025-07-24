@@ -1,41 +1,86 @@
 # 🦀 git-rust — A Git CLI clone Written in Rust
 
-git-rust is a simplified Git implementation built from scratch in Rust. It mimics core Git functionality such as init, hash-object, and cat-file, and serves both as a learning project and a functional Git-like CLI.
+git-rust is a simplified Git implementation built from scratch in Rust. It mimics core Git functionality of basic commands, listed below. It serves as a learning project.
 
 This project explores how Git works under the hood — from creating repositories and hashing objects, to writing Git-compliant blob files and reading them back from the .git/objects directory.
 
-# ✨ Current Features
+# ✨ Current Features and flags implemented
 
-    git-rust init — Initialize a new Git-like repository. Does not re-initialize a repo.
+    cargo run init          
+                            — Initialize a new Git-like repository. Does not re-initialize a repo.
 
-    git-rust hash-object -w <file> — Hash and write blob objects to .git/objects
+    cargo run add <file>    
+                            - Add files to staging area.
+                            - Index file compatible with git
 
-    git-rust cat-file -p <hash> — Decode and print stored objects
+    cargo run hash-object -w <hash>
+                            - Hash and write blob objects to .git/objects
+                            - flag -w (optional) - works as expected in git
 
-    Fully compatible object format (blob <size>\0<content>) using zlib compression
+    cargo run cat-file -p <hash>      
+                            - Decode and print stored objects
+                            - flag -p (optional) - different from git
+                                Blobs:      Always prints raw bytes to stdout
+                                Trees:      Without pretty pring, will send raw bytes to stdout
+                                Commits:    Always pretty print
 
-    Built with safety, performance, and testability in mind using idiomatic Rust
+    cargo run ls-files
+                            - Show the files in the index
 
-# 🛠️ Why This Project?
+    cargo run ls-tree <hash>
+                            - List the contents of a tree object.
 
-This project is ideal if you want to:
+    cargo run write-tree
+                            - Reads the index and creates tree objects.
 
-    Understand Git internals by building them yourself
+    cargo run commit-tree <hash> -p <hash> -m <message>
+                            - Creates a new commit object
+                            - flag -p can be used multiple times for parrent commits
+                            - flag -m can be used only once
 
-    Learn about SHA-1 hashing, zlib compression, and Git’s object model
-
-    Practice building command-line tools and file-based data structures in Rust
-
-
+    cargo run commit -a -m <message>
+                            - Record changes to the repository
+                            - flag -a not yet implemented. Changes need to be staged separately.
+                            - flag -m can be used only once.
 
 
 # 🛠️ Formatting helper 
 
+## Object files (blobs, tree and commits)
+All blob, tree and commit files are tested to be compatible with git.
+
+All git object files are preceded by a header. They are all compressed with zlib.
+A header contains the name of the object, followed by the size of te content (number of bytes) and null terminated.
+Example: "blob [size]\0
+Example: "tree [size]\0
+Example: "commit [size]\0
+
 ## A Blob file
-Todo
+The content is simply the contents of the original file.
+Contains no metadata.
 
 ## A Tree file
+The content is list of all the objects under that tree.  
+Each entry contains the mode, file name and the hash of that object.  
+The mode is terminated with a space and the filename is null terminated.  
+The hash is always 20 bytes.  
+
+```text
+example object 1    -> mode+b' '+file name+b'\0'+hash [u8; 20]
+example object 1    -> 100644+b' '+test.txt+b'\0'+63aa9936a393155f43c2b03d42d79b1c83290f41
+example output 1    -> 100644 blob 63aa9936a393155f43c2b03d42d79b1c83290f41 file.txt
+```
+Mode is specific to each object
+| **Object**     | **Mode** |
+|---------------|------------------|
+|blob|100644                  |
+|tree|40000                  |
+|commit|160000                  |
+
+
+## A Commit file
 Todo
+
 
 ## The INDEX file (staging area)
 It uses a binary layour (raw bytes) and always big-endian format.
