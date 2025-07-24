@@ -85,7 +85,7 @@ fn main() -> std::io::Result<()> {
             .arg(
                 Arg::new("add")
                 .short('a')
-                .value_name("ADD")
+                .action(ArgAction::SetTrue)
                 .help("Automatically stage files that have been modified and deleted, but new files you have not told Git about are not affected."))
             .arg(Arg::new("message")
                 .short('m')

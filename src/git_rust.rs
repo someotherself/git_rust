@@ -9,7 +9,12 @@ use thread_local::ThreadLocal;
 
 use crate::{
     index::Index,
-    objects::{self, blob::Blob, commit::Commit, tree::Tree},
+    objects::{
+        self,
+        blob::Blob,
+        commit::{Commit, CommitSummary},
+        tree::Tree,
+    },
 };
 
 pub const BASE_DIR: &str = ".git_rust";
@@ -185,7 +190,10 @@ impl RepoRust {
     }
 
     pub fn write_tree(_args: &ArgMatches) -> std::io::Result<()> {
-        Tree::encode_object()?;
+        let (trees, root_hash) = Tree::encode_object()?;
+        Tree::write_object_to_file(trees)?;
+        let root_hash = hex::encode(root_hash);
+        println!("{root_hash}");
         Ok(())
     }
 
@@ -200,12 +208,70 @@ impl RepoRust {
             .get_one::<String>("message")
             .unwrap_or(&"".into())
             .to_owned();
-        let commit = Commit::encode(hash, commit.clone(), message)?;
+        let commit = Commit::encode(hash, commit.clone(), &message)?;
         commit.write_commit_to_file()?;
         Ok(())
     }
 
-    pub fn commit(_args: &ArgMatches) -> std::io::Result<()> {
-        todo!()
+    // TODO Crate refs/heads/master if initial commit
+    pub fn commit(args: &ArgMatches) -> std::io::Result<()> {
+        // TODO Add the -a flag
+        let message = args
+            .get_one::<String>("message")
+            .unwrap_or(&"".into())
+            .to_owned();
+
+        // Build the current index. Get trees and the hash for the root tree.
+        let (trees, new_tree_hash_bytes) = Tree::encode_object()?;
+        let new_tree_hash = hex::encode(new_tree_hash_bytes);
+        // Get commit hash from head. Early return if a detached head.
+        // let last_branch_commit = Commit::get_branch_commit()?.ok_or_else(|| std::io::Error::other("Detached head. Not implemented"))?;
+        // // Read tree hash from last commit
+        // let last_tree_hash = Commit::get_tree_from_commit(&last_branch_commit)?;
+
+        // Read head and get path.
+        let head_str = Commit::read_head()?;
+        let branch_path = Commit::get_branch_from_head(&head_str)?;
+        // Check if it exists
+        let mut parent_commits: Vec<String> = vec![];
+        if !Path::new(&branch_path).exists() {
+            // Create the branch file and leave parents_branches empty
+            std::fs::create_dir_all(branch_path.parent().unwrap())?;
+            std::fs::File::create_new(&branch_path)?;
+        } else {
+            // Read it and push to parent_branches
+            let parent_hash = Commit::get_branch_commit()?;
+            parent_commits.push(parent_hash.clone());
+            let parent_commit = Commit::decode(&parent_hash)?;
+            let last_tree_hash = parent_commit.tree_hash;
+
+            // Use root tree hash to check if there's anything new in staging
+            if new_tree_hash == last_tree_hash {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Commit object not found",
+                ));
+            };
+        }
+        // If we can commit, write the trees to file...
+        Tree::write_object_to_file(trees)?;
+
+        // ..and the new commit
+        let commit = Commit::encode(new_tree_hash, parent_commits, &message)?;
+        let new_commit_hash = commit.write_commit_to_file()?;
+
+        // Update the branch to point to the new commit
+        let branch = Commit::update_branch_hash(&new_commit_hash)?;
+        let commit_summary = CommitSummary {
+            branch,
+            commit_hash: new_commit_hash,
+            message,
+        };
+        // Update reflog
+        // TODO
+
+        // Show summary w/ git diff - TODO
+        println!("{commit_summary}");
+        Ok(())
     }
 }

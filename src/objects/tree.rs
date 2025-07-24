@@ -31,14 +31,13 @@ impl Tree {
         &self.header
     }
 
-    pub fn encode_object() -> std::io::Result<()> {
+    // Reads the index and returns the entries
+    // All blobs groups by folder
+    // Used to git commit. "Early" returns the root hash to check against the index
+    pub fn encode_object() -> std::io::Result<(Vec<Tree>, [u8; 20])> {
         let index = Index::read_index()?;
         let entries_by_folder = Self::group_entries_for_tree_build(index.entries);
-        let trees = Self::build_trees(entries_by_folder);
-        Self::write_object_to_file(trees.0)?;
-        let hash = hex::encode(trees.1);
-        println!("{hash}");
-        Ok(())
+        Ok(Self::build_trees(entries_by_folder))
     }
 
     // ls-tree
@@ -70,7 +69,7 @@ impl Tree {
         Ok(tree)
     }
 
-    fn write_object_to_file(trees: Vec<Self>) -> std::io::Result<()> {
+    pub fn write_object_to_file(trees: Vec<Self>) -> std::io::Result<()> {
         let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
         for tree in trees {
             let mut content: Vec<u8> = Vec::new();

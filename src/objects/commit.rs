@@ -1,4 +1,8 @@
-use std::io::Write;
+use std::{
+    fs::OpenOptions,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use chrono::Local;
 use flate2::{Compress, Compression, write::ZlibEncoder};
@@ -6,17 +10,25 @@ use hex::ToHex;
 use sha1::{Digest, Sha1};
 
 use crate::{
-    git_rust::RepoRust,
+    git_rust::{BASE_DIR, RepoRust},
     objects::{self, Header},
 };
 
 pub struct Commit {
-    header: Header,
-    tree_hash: String,
-    parents_hash: Vec<String>,
-    author: Autors,
-    committer: Autors,
-    message: String,
+    pub header: Header,
+    pub tree_hash: String,
+    pub parents_hash: Vec<String>,
+    pub author: Autors,
+    pub committer: Autors,
+    pub message: String,
+}
+
+#[derive(Debug)]
+pub struct CommitSummary {
+    pub branch: String,
+    pub commit_hash: String,
+    pub message: String,
+    // pub file_changes: Vec<FileChange>,
 }
 
 #[derive(Default)]
@@ -95,11 +107,67 @@ impl Commit {
         contents
     }
 
-    pub fn encode(
-        tree_hash: String,
-        commit: Vec<String>,
-        message: String,
-    ) -> std::io::Result<Self> {
+    pub fn read_head() -> std::io::Result<String> {
+        let root = &RepoRust::get_root().absolute_path;
+        let head_path = root.join(BASE_DIR).join("HEAD");
+        let head_bytes = std::fs::read(head_path)?;
+        let head_str = String::from_utf8(head_bytes.to_vec()).unwrap();
+        Ok(head_str)
+    }
+
+    // Returns Ok() where some is the relative path to the branch file. Which may or may not exist yet.
+    // Returns Err for a detached head
+    pub fn get_branch_from_head(head_str: &str) -> std::io::Result<PathBuf> {
+        let root: &PathBuf = &RepoRust::get_root().absolute_path;
+        if !head_str.starts_with("ref: ") {
+            std::io::Error::other("Detached head. Not implemented");
+        }
+        let branch = &head_str["refs: ".len() - 1..];
+        let branch = branch.strip_suffix('\n').unwrap_or(branch);
+        let branch_path = root.join(BASE_DIR).join(Path::new(branch));
+        Ok(branch_path)
+    }
+
+    // Compares the new tree hash with the last tree
+    // Does not handle merged commits
+    // Returns Ok(branch)
+    // Returns Err
+    pub fn get_branch_commit() -> std::io::Result<String> {
+        let head_str = Self::read_head()?;
+        // Read the branch file
+        let branch_path = Self::get_branch_from_head(&head_str)?;
+        if !branch_path.exists() {
+            std::fs::File::create(&branch_path)?;
+            return Err(std::io::Error::other(
+                "Initial commit — no parent commit yet",
+            ));
+        }
+        let branch_hash = std::fs::read(branch_path)?;
+        let branch_hash_str = str::from_utf8(&branch_hash).unwrap().to_string();
+        Ok(branch_hash_str)
+    }
+
+    // Returns the name of the branch updated
+    pub fn update_branch_hash(hash: &str) -> std::io::Result<String> {
+        let head_str = Commit::read_head()?;
+        let branch_path = Self::get_branch_from_head(&head_str)
+            .ok()
+            .ok_or_else(|| std::io::Error::other("Detached head. Not implemented"))?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&branch_path)?;
+        file.write_all(hash.as_bytes())?;
+        let branch_name = branch_path.file_name().unwrap().to_string_lossy();
+        Ok(branch_name.into())
+    }
+
+    pub fn get_tree_from_commit(commit: &str) -> std::io::Result<String> {
+        let commit = Commit::decode(commit)?;
+        Ok(commit.tree_hash)
+    }
+
+    pub fn encode(tree_hash: String, commit: Vec<String>, message: &str) -> std::io::Result<Self> {
         // Check if the tree is valid
         objects::get_object_path(&tree_hash).ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "Tree object not found")
@@ -155,7 +223,7 @@ impl Commit {
             parents_hash: commit,
             author,
             committer,
-            message,
+            message: message.into(),
         };
         let contents = commit.to_bytes();
         let header = Header {
@@ -238,13 +306,14 @@ impl Commit {
         })
     }
 
-    pub fn write_commit_to_file(&self) -> std::io::Result<()> {
+    // Returns the hash of the new commit
+    pub fn write_commit_to_file(&self) -> std::io::Result<String> {
         let objects_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
 
         let header = format!("commit {}\0", self.header.size);
         let commit_bytes = &self.to_bytes();
 
-        let hash = Self::sha1_tree(commit_bytes);
+        let hash = Self::sha1_commit(commit_bytes);
         let (folder_name, file_name) = hash.split_at(2);
         let folder_path = objects_path.join(folder_name);
         let file_path = folder_path.join(file_name);
@@ -261,10 +330,10 @@ impl Commit {
         content.extend_from_slice(commit_bytes);
         enc.write_all(&content)?;
         enc.finish()?;
-        Ok(())
+        Ok(hash)
     }
 
-    pub fn sha1_tree(content: &[u8]) -> String {
+    pub fn sha1_commit(content: &[u8]) -> String {
         let mut hasher = Sha1::new();
         hasher.update(format!("commit {}\0", content.len()).as_bytes());
         hasher.update(content);
@@ -295,5 +364,11 @@ impl std::fmt::Display for Commit {
         writeln!(f, "committer {}", self.committer)?;
         writeln!(f)?;
         writeln!(f, "{}", self.message.trim_end())
+    }
+}
+
+impl std::fmt::Display for CommitSummary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "[{} {}] {}", self.branch, self.commit_hash, self.message)
     }
 }
