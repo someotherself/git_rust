@@ -41,9 +41,9 @@ impl Tree {
     }
 
     // ls-tree
-    pub fn decode_object(hash_str: String) -> std::io::Result<Self> {
+    pub fn decode_object(hash_str: &str) -> std::io::Result<Self> {
         let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
-        let hash_vec = hex::decode(&hash_str).map_err(|e| {
+        let hash_vec = hex::decode(hash_str).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 format!("Invalid SHA1: {e}"),
@@ -189,7 +189,7 @@ impl Tree {
             while bytes_output[i] != b' ' {
                 i += 1;
             }
-            let mode = String::from_utf8(bytes_output[start..i].to_vec()).unwrap();
+            let mode = str::from_utf8(&bytes_output[start..i]).unwrap().to_string();
             let objecttype: ObjectType;
             match mode.as_str() {
                 "100644" => objecttype = ObjectType::Blob,
@@ -203,7 +203,7 @@ impl Tree {
             while bytes_output[i] != b'\0' {
                 i += 1;
             }
-            let name = String::from_utf8(bytes_output[start..i].to_vec()).unwrap();
+            let name = str::from_utf8(&bytes_output[start..i]).unwrap().to_string();
             start = i + 1;
             let mut hash = [0_u8; 20];
             hash.copy_from_slice(&bytes_output[start..start + 20]);

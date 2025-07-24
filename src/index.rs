@@ -103,7 +103,7 @@ impl IndexEntry {
         buf.extend(&self.flags.to_be_bytes());
 
         // Write path name as null-terminated string (not padded yet)
-        buf.extend(self.path.clone());
+        buf.extend(&self.path);
         buf.push(0); // Null terminator
 
         // Pad to 8-byte alignment
@@ -206,7 +206,7 @@ impl Index {
     //      A. Path exists and SHA1 is different         -> Update index. Persist change
     //      B. Path does not exist in index              -> Add to index. Persist change
     //      C. Path exists and SHA1 is same              -> Move on
-    pub fn build_index(input: String) -> std::io::Result<()> {
+    pub fn build_index(input: &str) -> std::io::Result<()> {
         let abs_root_path = &RepoRust::get_root().absolute_path;
         let mut entries = if abs_root_path.join(BASE_DIR).join("index").exists() {
             Self::read_index()?.entries
@@ -240,11 +240,11 @@ impl Index {
                 match entries.get(&key) {
                     // A.Path does not exist in index -> Add to index
                     None => {
-                        entries.insert(key, entry.clone());
+                        entries.insert(key, entry);
                     }
                     // B. Path exists and SHA1 is different -> Update index
                     Some(existing_entry) if existing_entry.sha1 != entry.sha1 => {
-                        entries.insert(key, entry.clone());
+                        entries.insert(key, entry);
                     }
                     // C. Path exists and SHA1 is same
                     _ => {}
@@ -384,8 +384,9 @@ impl Index {
         let mut bytes_read = 12;
         for _ in 0..total_entries {
             let (entry, size) = IndexEntry::from_bytes(&file[bytes_read..])?;
-            let path = String::from_utf8(entry.path.clone())
-                .map_err(|_| std::io::Error::other("Invalid path when parsing IndexEntry"))?;
+            let path = str::from_utf8(&entry.path)
+                .map_err(|_| std::io::Error::other("Invalid path when parsing IndexEntry"))?
+                .to_string();
             entries.insert(path, entry);
             bytes_read += size;
         }

@@ -167,9 +167,9 @@ impl Commit {
         Ok(commit.tree_hash)
     }
 
-    pub fn encode(tree_hash: String, commit: Vec<String>, message: &str) -> std::io::Result<Self> {
+    pub fn encode(tree_hash: &str, commit: Vec<String>, message: &str) -> std::io::Result<Self> {
         // Check if the tree is valid
-        objects::get_object_path(&tree_hash).ok_or_else(|| {
+        objects::get_object_path(tree_hash).ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "Tree object not found")
         })?;
 
@@ -219,7 +219,7 @@ impl Commit {
 
         let mut commit = Self {
             header: temp_header,
-            tree_hash,
+            tree_hash: tree_hash.to_string(),
             parents_hash: commit,
             author,
             committer,

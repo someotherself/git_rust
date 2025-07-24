@@ -93,7 +93,7 @@ pub fn cat_file(hash: &str, pretty: bool) -> std::io::Result<Vec<u8>> {
                 content = Tree::de_compress(&file)?;
                 std::io::stdout().write_all(&content)?;
             } else {
-                let tree = Tree::decode_object(hash.to_string())?;
+                let tree = Tree::decode_object(hash)?;
                 println!("{tree}");
             }
         }

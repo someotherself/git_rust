@@ -52,7 +52,7 @@ impl Blob {
             .get_one::<String>("file")
             .expect("File is required.")
             .to_owned();
-        RepoRust::check_paths(object.clone())?;
+        RepoRust::check_paths(&object)?;
         let file = std::fs::read(PathBuf::from(object))?;
         let blob = Self::blob_with_sha1(&file);
         if sub_arg {
@@ -128,7 +128,7 @@ impl Blob {
 
 impl Display for Blob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let hash = self.hash.clone();
+        let hash = &self.hash;
         write!(f, "{hash}")
     }
 }

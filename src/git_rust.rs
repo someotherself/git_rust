@@ -116,7 +116,7 @@ impl RepoRust {
     // Should not allow paths with // or ..
     // Ensure paths are correctly parsed and inside root
     // Correctly format the paths for the index
-    pub fn check_paths(path: String) -> std::io::Result<()> {
+    pub fn check_paths(path: &str) -> std::io::Result<()> {
         let path = Path::new(&path);
         for comp in path.components() {
             match comp {
@@ -169,15 +169,15 @@ impl RepoRust {
             .get_one::<String>("hash")
             .expect("Object is required.")
             .to_owned();
-        let tree = Tree::decode_object(hash_str)?;
+        let tree = Tree::decode_object(&hash_str)?;
         println!("{tree}");
         Ok(())
     }
 
     pub fn add(args: &ArgMatches) -> std::io::Result<()> {
         let path = args.get_one::<String>("path").unwrap().to_owned();
-        Self::check_paths(path.clone())?;
-        Index::build_index(path)?;
+        Self::check_paths(&path)?;
+        Index::build_index(&path)?;
         Ok(())
     }
 
@@ -208,7 +208,7 @@ impl RepoRust {
             .get_one::<String>("message")
             .unwrap_or(&"".into())
             .to_owned();
-        let commit = Commit::encode(hash, commit.clone(), &message)?;
+        let commit = Commit::encode(&hash, commit, &message)?;
         commit.write_commit_to_file()?;
         Ok(())
     }
@@ -257,7 +257,7 @@ impl RepoRust {
         Tree::write_object_to_file(trees)?;
 
         // ..and the new commit
-        let commit = Commit::encode(new_tree_hash, parent_commits, &message)?;
+        let commit = Commit::encode(&new_tree_hash, parent_commits, &message)?;
         let new_commit_hash = commit.write_commit_to_file()?;
 
         // Update the branch to point to the new commit
