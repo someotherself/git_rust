@@ -201,9 +201,8 @@ impl RepoRust {
         let hash = args.get_one::<String>("hash").unwrap().to_owned();
         let commit = args
             .get_many::<String>("commit")
-            .unwrap_or_default()
-            .cloned()
-            .collect::<Vec<_>>();
+            .map(|vals| vals.cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
         let message = args
             .get_one::<String>("message")
             .unwrap_or(&"".into())

@@ -10,7 +10,7 @@ use git2::IndexAddOption;
 use crate::{
     git_rust::{self, BASE_DIR},
     index::Index,
-    objects::{self, blob, tree::Tree},
+    objects::{self, blob, commit::Commit, tree::Tree},
     test_common::{run_test, run_test_matches},
 };
 
@@ -2081,67 +2081,6 @@ fn test_write_tree_multiple_folders_7() {
         for (r, l) in rust_files.iter().zip(libgit_files.iter()) {
             assert_eq!(r, l, "Git object filename mismatch: {} != {}", r, l);
         }
-
-        // TODO: Why does this fail?
-        // use flate2::read::ZlibDecoder;
-        // use sha1::{Digest, Sha1};
-        // use std::read;
-        // let rust_objects_dir = git_rust_objects_folder;
-        // let libgit_objects_dir = git_objects_folder;
-
-        // let mut rust_hashes: Vec<String> = Vec::new();
-        // let mut stack = vec![rust_objects_dir.clone()];
-        // while let Some(dir) = stack.pop() {
-        //     for entry in std::fs::read_dir(&dir).unwrap() {
-        //         let entry = entry.unwrap();
-        //         let path = entry.path();
-        //         if path.is_dir() {
-        //             stack.push(path);
-        //         } else {
-        //             let file = std::fs::File::open(&path).unwrap();
-        //             let mut z = ZlibDecoder::new(file);
-        //             let mut decompressed = Vec::new();
-        //             z.read_to_end(&mut decompressed).unwrap();
-
-        //             let mut hasher = Sha1::new();
-        //             hasher.update(&decompressed);
-        //             rust_hashes.push(format!("{:x}", hasher.finalize()));
-        //         }
-        //     }
-        // }
-
-        // let mut libgit_hashes: Vec<String> = Vec::new();
-        // let mut stack = vec![libgit_objects_dir.clone()];
-        // while let Some(dir) = stack.pop() {
-        //     for entry in std::fs::read_dir(&dir).unwrap() {
-        //         let entry = entry.unwrap();
-        //         let path = entry.path();
-        //         if path.is_dir() {
-        //             stack.push(path);
-        //         } else {
-        //             let file = std::fs::File::open(&path).unwrap();
-        //             let mut z = ZlibDecoder::new(file);
-        //             let mut decompressed = Vec::new();
-        //             z.read_to_end(&mut decompressed).unwrap();
-
-        //             let mut hasher = Sha1::new();
-        //             hasher.update(&decompressed);
-        //             libgit_hashes.push(format!("{:x}", hasher.finalize()));
-        //         }
-        //     }
-        // }
-
-        // rust_hashes.sort();
-        // libgit_hashes.sort();
-
-        // assert_eq!(
-        //     rust_hashes.len(),
-        //     libgit_hashes.len(),
-        //     "Number of git objects differ"
-        // );
-        // for (r, l) in rust_hashes.iter().zip(libgit_hashes.iter()) {
-        //     assert_eq!(r, l, "Object hash mismatch: {} != {}", r, l);
-        // }
     });
 }
 
@@ -2345,5 +2284,193 @@ fn test_write_tree_multiple_folders_9() {
         for idx in 0..all_git_folders.len() {
             assert_eq!(all_git_folders[idx], all_rust_git_folders[idx]);
         }
+    });
+}
+
+#[test]
+fn test_write_commit_tree_normal_op() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
+
+        // Create a file
+        let file_path = path.join("test1.txt");
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(b"this is a test").unwrap();
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        // Stage it
+        let add_args = run_test_matches(vec!["", "add", &format!("{}", "test1.txt")]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+
+        // Bypass the write-tree functions to get the tree_hash
+        let (_, tree_hash) = Tree::encode_object().unwrap();
+        let tree_hash_str = hex::encode(tree_hash);
+
+        // Index
+        let write_tree_args = run_test_matches(vec!["", "write-tree"]);
+        git_rust::RepoRust::write_tree(&write_tree_args).unwrap();
+
+        let commit_tree_args = run_test_matches(vec![
+            "",
+            "commit-tree",
+            &tree_hash_str,
+            // "-p",
+            // "",
+            "-m",
+            "This is the commit message",
+        ]);
+        git_rust::RepoRust::commit_tree(&commit_tree_args).unwrap();
+
+        // Try to commit again
+        let result = git_rust::RepoRust::commit_tree(&commit_tree_args);
+        assert!(result.is_ok());
+    });
+}
+
+#[test]
+fn test_write_commit_tree_internal() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
+
+        // Create a file
+        let file_path = path.join("test1.txt");
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(b"this is a test").unwrap();
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        // Stage it
+        let add_args = run_test_matches(vec!["", "add", &format!("{}", "test1.txt")]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+
+        // Bypass the write-tree functions to get the tree_hash
+        let (_, tree_hash) = Tree::encode_object().unwrap();
+        let tree_hash_str = hex::encode(tree_hash);
+
+        // Index
+        let write_tree_args = run_test_matches(vec!["", "write-tree"]);
+        git_rust::RepoRust::write_tree(&write_tree_args).unwrap();
+
+        let parent_commit_1: Vec<String> = Vec::new();
+        let message_1 = "This is a test commit 1".to_string();
+
+        let commit_1 = Commit::encode(&tree_hash_str, parent_commit_1.clone(), &message_1).unwrap();
+
+        assert_eq!(commit_1.tree_hash, tree_hash_str);
+        assert_eq!(commit_1.parents_hash, parent_commit_1);
+        assert_eq!(commit_1.message, message_1);
+
+        // Create another file
+        let file_path_2 = path.join("test2.txt");
+        let mut file_2 = std::fs::File::create(&file_path_2).unwrap();
+        file_2.write_all(b"this is a test").unwrap();
+
+        // Stage it
+        let add_args_2 = run_test_matches(vec!["", "add", &format!("{}", "test2.txt")]);
+        git_rust::RepoRust::add(&add_args_2).unwrap();
+
+        // Bypass the write-tree functions to get the tree_hash
+        let (_, tree_hash_2) = Tree::encode_object().unwrap();
+        let tree_hash_str_2 = hex::encode(tree_hash_2);
+
+        // Index
+        let write_tree_args = run_test_matches(vec!["", "write-tree"]);
+        git_rust::RepoRust::write_tree(&write_tree_args).unwrap();
+
+        let parent_commit_2: Vec<String> = Vec::from(commit_1.parents_hash);
+        let message_2 = "This is a test commit 1".to_string();
+        let commit_2 =
+            Commit::encode(&tree_hash_str_2, parent_commit_2.clone(), &message_2).unwrap();
+
+        assert_eq!(commit_2.tree_hash, tree_hash_str_2);
+        assert_eq!(commit_2.parents_hash, parent_commit_2);
+        assert_eq!(commit_2.message, message_1);
+    });
+}
+
+#[test]
+fn test_write_commit_tree_bad_tree() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
+
+        // Create a file
+        let file_path = path.join("test1.txt");
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(b"this is a test").unwrap();
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        // Stage it
+        let add_args = run_test_matches(vec!["", "add", &format!("{}", "test1.txt")]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+
+        // Bypass the write-tree functions to get the tree_hash
+        let (_, tree_hash) = Tree::encode_object().unwrap();
+        let good_tree_hash_str = hex::encode(tree_hash);
+
+        // Create empty tree
+        let tree_hash_str = String::new();
+
+        // Index
+        let write_tree_args = run_test_matches(vec!["", "write-tree"]);
+        git_rust::RepoRust::write_tree(&write_tree_args).unwrap();
+
+        let commit_tree_args = run_test_matches(vec![
+            "",
+            "commit-tree",
+            &tree_hash_str,
+            // "-p",
+            // "",
+            "-m",
+            "This is the commit message",
+        ]);
+        let result = git_rust::RepoRust::commit_tree(&commit_tree_args);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "No tree provided".to_string()
+        );
+
+        // Provide a random hash
+        let tree_hash_str_2 = String::from("e818a764ab535ed3b636b4a9ad56240d7d1b0e20");
+        let commit_tree_args_2 = run_test_matches(vec![
+            "",
+            "commit-tree",
+            &tree_hash_str_2,
+            // "-p",
+            // "",
+            "-m",
+            "This is the commit message",
+        ]);
+        let result = git_rust::RepoRust::commit_tree(&commit_tree_args_2);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Tree object not found".to_string()
+        );
+
+        // Provide a random hash
+
+        let parent_commit_1: Vec<String> = Vec::new();
+        let message_1 = "This is a test commit 1".to_string();
+
+        let commit_1 =
+            Commit::encode(&good_tree_hash_str, parent_commit_1.clone(), &message_1).unwrap();
+        let parent_commit = commit_1.write_commit_to_file().unwrap();
+        let good_parent_commits = vec![parent_commit.clone(), parent_commit];
+        assert_eq!(good_parent_commits.len(), 2);
+        let message_1 = "This is a test commit 1".to_string();
+        let commit_1 =
+            Commit::encode(&good_tree_hash_str, good_parent_commits.clone(), &message_1).unwrap();
+
+        assert_eq!(commit_1.parents_hash.len(), 1);
     });
 }

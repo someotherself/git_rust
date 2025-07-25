@@ -68,6 +68,7 @@ fn main() -> std::io::Result<()> {
                     Arg::new("commit")
                         .short('p')
                         .value_name("COMMIT")
+                        .num_args(1)
                         .action(clap::ArgAction::Append)
                         .help("Optional parent commit hash (for non-root commits)"),
                 )

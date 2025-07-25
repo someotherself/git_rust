@@ -134,6 +134,36 @@ fn write_tree_mock(args: Vec<&str>) -> ArgMatches {
     arg
 }
 
+fn commit_tree_mock(args: Vec<&str>) -> ArgMatches {
+    let matches = command!().subcommand(
+        Command::new("commit-tree")
+            .about("Create a new commit object")
+            .arg(
+                Arg::new("hash")
+                    .required(true)
+                    .value_name("HASH")
+                    .help("The tree object hash to commit"),
+            )
+            .arg(
+                Arg::new("commit")
+                    .short('p')
+                    .value_name("COMMIT")
+                    .action(clap::ArgAction::Append)
+                    .help("Optional parent commit hash (for non-root commits)"),
+            )
+            .arg(
+                Arg::new("message")
+                    .short('m')
+                    .value_name("MESSAGE")
+                    .default_value("")
+                    .help("Commit message (if not provided, reads from stdin)"),
+            ),
+    );
+    let mut matches = matches.get_matches_from(args);
+    let (_, arg) = matches.remove_subcommand().unwrap();
+    arg
+}
+
 pub fn run_test_matches(args: Vec<&str>) -> ArgMatches {
     match args[1] {
         "cat-file" => return cat_file_mock(args),
@@ -141,6 +171,7 @@ pub fn run_test_matches(args: Vec<&str>) -> ArgMatches {
         "ls-tree" => return ls_tree_mock(args),
         "add" => return add_mock(args),
         "write-tree" => return write_tree_mock(args),
+        "commit-tree" => return commit_tree_mock(args),
         _ => panic!("Wrong test command!"),
     }
 }

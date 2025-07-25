@@ -130,8 +130,7 @@ impl Commit {
 
     // Compares the new tree hash with the last tree
     // Does not handle merged commits
-    // Returns Ok(branch)
-    // Returns Err
+    // Returns Ok(branch) if the branch file exists
     pub fn get_branch_commit() -> std::io::Result<String> {
         let head_str = Self::read_head()?;
         // Read the branch file
@@ -169,16 +168,30 @@ impl Commit {
 
     pub fn encode(tree_hash: &str, commit: Vec<String>, message: &str) -> std::io::Result<Self> {
         // Check if the tree is valid
+        if tree_hash.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "No tree provided",
+            ));
+        };
         objects::get_object_path(tree_hash).ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "Tree object not found")
         })?;
-
         // Check if the parents are valid
         if !commit.is_empty() {
             for hash in &commit {
                 objects::get_object_path(hash).ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "Commit object not found")
                 })?;
+            }
+        }
+        // Check parents have no duplicates
+        let mut parents_hash: Vec<String> = Vec::new();
+        for hash in commit {
+            if !parents_hash.contains(&hash) {
+                parents_hash.push(hash);
+            } else {
+                println!("error: duplicate parent {hash} ignored");
             }
         }
 
@@ -220,7 +233,7 @@ impl Commit {
         let mut commit = Self {
             header: temp_header,
             tree_hash: tree_hash.to_string(),
-            parents_hash: commit,
+            parents_hash,
             author,
             committer,
             message: message.into(),
