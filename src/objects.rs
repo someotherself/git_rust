@@ -85,16 +85,16 @@ pub fn cat_file(hash: &str, pretty: bool) -> std::io::Result<Vec<u8>> {
     match header.object {
         // -p not implemented for all
         ObjectType::Blob => {
-            content = Blob::decode_object(de_compressed_file)?;
+            content = Blob::decode_object(&de_compressed_file)?;
             std::io::stdout().write_all(&content)?;
         }
         ObjectType::Tree => {
-            if !pretty {
-                content = Tree::de_compress(&file)?;
-                std::io::stdout().write_all(&content)?;
-            } else {
+            if pretty {
                 let tree = Tree::decode_object(hash)?;
                 println!("{tree}");
+            } else {
+                content = Tree::de_compress(&file)?;
+                std::io::stdout().write_all(&content)?;
             }
         }
         ObjectType::Commit => {

@@ -164,6 +164,23 @@ fn commit_tree_mock(args: Vec<&str>) -> ArgMatches {
     arg
 }
 
+fn commit_mock(args: Vec<&str>) -> ArgMatches {
+    let matches = command!().subcommand(
+            Command::new("commit").about("Record changes to the repository")
+            .arg(
+                Arg::new("add")
+                .short('a')
+                .action(ArgAction::SetTrue)
+                .help("Automatically stage files that have been modified and deleted, but new files you have not told Git about are not affected."))
+            .arg(Arg::new("message")
+                .short('m')
+                .value_name("MESSAGE")
+                .help("Add a commit message.")));
+    let mut matches = matches.get_matches_from(args);
+    let (_, arg) = matches.remove_subcommand().unwrap();
+    arg
+}
+
 pub fn run_test_matches(args: Vec<&str>) -> ArgMatches {
     match args[1] {
         "cat-file" => return cat_file_mock(args),
@@ -172,6 +189,7 @@ pub fn run_test_matches(args: Vec<&str>) -> ArgMatches {
         "add" => return add_mock(args),
         "write-tree" => return write_tree_mock(args),
         "commit-tree" => return commit_tree_mock(args),
+        "commit" => return commit_mock(args),
         _ => panic!("Wrong test command!"),
     }
 }

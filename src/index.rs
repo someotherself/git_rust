@@ -217,7 +217,7 @@ impl Index {
         let mut stack = vec![path];
         while let Some(current_path) = stack.pop() {
             if current_path.is_file() {
-                if Self::exists_in_git_ignore(&current_path, false)? {
+                if Self::exists_in_git_ignore(&current_path, false) {
                     continue;
                 }
                 // 1. Get entry - index the file
@@ -253,7 +253,7 @@ impl Index {
                 if current_path.ends_with(".git_rust") {
                     continue;
                 }
-                if Self::exists_in_git_ignore(&current_path, true)? {
+                if Self::exists_in_git_ignore(&current_path, true) {
                     continue;
                 }
 
@@ -269,13 +269,13 @@ impl Index {
         Ok(())
     }
 
-    fn exists_in_git_ignore(path: &Path, is_dir: bool) -> std::io::Result<bool> {
+    fn exists_in_git_ignore(path: &Path, is_dir: bool) -> bool {
         let root = &RepoRust::get_root().absolute_path;
         let mut builder = GitignoreBuilder::new(root);
         builder.add(root.join(".gitrust_ignore"));
         let matcher = builder.build().unwrap();
 
-        Ok(matcher.matched(path, is_dir).is_ignore())
+        matcher.matched(path, is_dir).is_ignore()
     }
 
     pub fn sha1_entry(file: &[u8]) -> [u8; 20] {
@@ -375,7 +375,7 @@ impl Index {
         let file = std::fs::read(index_path)?;
         // Parse header
         if file.len() < 12 {
-            return Ok(Index::default());
+            return Ok(Self::default());
         }
         let header = IndexHeader::header(&file[..12])?;
         let total_entries = u32::from_be_bytes(header.entries);

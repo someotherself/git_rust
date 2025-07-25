@@ -38,7 +38,7 @@ impl Blob {
     }
 
     // cat-file command
-    pub fn decode_object(content: Vec<u8>) -> std::io::Result<Vec<u8>> {
+    pub fn decode_object(content: &[u8]) -> std::io::Result<Vec<u8>> {
         let null_pos = content.iter().position(|&b| b == b'\0').unwrap();
         let content_bytes = content[null_pos + 1..].to_vec();
         // let contents = Blob::new_from_bytes(bytes_output)?;

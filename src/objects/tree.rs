@@ -34,10 +34,10 @@ impl Tree {
     // Reads the index and returns the entries
     // All blobs groups by folder
     // Used to git commit. "Early" returns the root hash to check against the index
-    pub fn encode_object() -> std::io::Result<(Vec<Tree>, [u8; 20])> {
+    pub fn encode_object() -> std::io::Result<(Vec<Self>, [u8; 20])> {
         let index = Index::read_index()?;
         let entries_by_folder = Self::group_entries_for_tree_build(index.entries);
-        Ok(Self::build_trees(entries_by_folder))
+        Ok(Self::build_trees(&entries_by_folder))
     }
 
     // ls-tree
@@ -149,7 +149,7 @@ impl Tree {
             let mode_str = match tree_entry.object_type {
                 ObjectType::Blob => "100644",
                 ObjectType::Tree => "40000",
-                _ => continue,
+                ObjectType::Commit => "160000",
             };
             content.extend_from_slice(mode_str.as_bytes());
             content.push(b' ');
@@ -238,7 +238,7 @@ impl Tree {
             let parent_path = path
                 .parent()
                 .filter(|p| *p != Path::new(""))
-                .unwrap_or(Path::new(""));
+                .unwrap_or_else(|| Path::new(""));
             entries_by_folder
                 .entry(parent_path.to_str().unwrap().into())
                 .or_default()
@@ -248,12 +248,12 @@ impl Tree {
     }
 
     pub fn build_trees(
-        entries_by_folder: BTreeMap<String, Vec<(PathBuf, IndexEntry)>>,
+        entries_by_folder: &BTreeMap<String, Vec<(PathBuf, IndexEntry)>>,
     ) -> (Vec<Self>, [u8; 20]) {
         // Create a hash table of all the folders and trees
         // Create and update trees and write to file at the end
         let mut tree_list: HashMap<PathBuf, Self> = HashMap::new();
-        for (path, children) in &entries_by_folder {
+        for (path, children) in entries_by_folder {
             let mut tree_entries: Vec<TreeEntry> = Vec::new();
             // Create the blob for each file
             for (child, entry) in children {

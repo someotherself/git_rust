@@ -8,7 +8,7 @@ use std::{
 use git2::IndexAddOption;
 
 use crate::{
-    git_rust::{self, BASE_DIR},
+    git_rust::{self, BASE_DIR, RepoRust},
     index::Index,
     objects::{self, blob, commit::Commit, tree::Tree},
     test_common::{run_test, run_test_matches},
@@ -522,7 +522,7 @@ fn test_git_write_trees() {
         let index = Index::read_index().unwrap();
 
         let entries_by_folder = Tree::group_entries_for_tree_build(index.entries);
-        Tree::build_trees(entries_by_folder);
+        Tree::build_trees(&entries_by_folder);
     });
 }
 
@@ -2471,5 +2471,79 @@ fn test_write_commit_tree_bad_tree() {
             Commit::encode(&good_tree_hash_str, good_parent_commits.clone(), &message_1).unwrap();
 
         assert_eq!(commit_1.parents_hash.len(), 1);
+    });
+}
+
+#[test]
+fn test_write_commit_normal() {
+    run_test(|setup| {
+        // Get test dir
+        let setup = setup.lock().unwrap().take().unwrap().dir;
+        let path = PathBuf::from(&setup.test_dir);
+
+        // Create a file
+        let file_path = path.join("test1.txt");
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(b"this is a test").unwrap();
+
+        git_rust::RepoRust::new_repo(path.to_str().unwrap()).unwrap();
+        git_rust::RepoRust::init().unwrap();
+
+        // Commit with no index
+        let commit_args = run_test_matches(vec!["", "commit", "-m", "Test commit"]);
+        let result = RepoRust::commit(&commit_args);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Index file not found. Please use use add to track".to_string()
+        );
+
+        // Stage the file
+        let add_args = run_test_matches(vec!["", "add", &format!("{}", "test1.txt")]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+
+        // Make sure branch does not exist - Initial commit
+        let branch = setup.root.path().join(".git_rust/refs/heads/master");
+        assert!(!branch.exists());
+
+        // commit
+        let commit_args = run_test_matches(vec!["", "commit", "-m", "Test commit"]);
+        let result = RepoRust::commit(&commit_args);
+        assert!(result.is_ok());
+
+        // Branch file should exist
+        assert!(branch.exists());
+        let branch_content = std::fs::read(&branch).unwrap();
+        let commit_1 = str::from_utf8(&branch_content).unwrap();
+        assert_eq!(commit_1.len(), 40);
+
+        // commit again - should fail
+        let result = RepoRust::commit(&commit_args);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Nothing added to commit but untracked files present (use add to track)".to_string()
+        );
+
+        // Create a file
+        let file_path_2 = path.join("test2.txt");
+        let mut file_2 = std::fs::File::create(&file_path_2).unwrap();
+        file_2.write_all(b"this is another test file").unwrap();
+
+        // Stage the file
+        let add_args = run_test_matches(vec!["", "add", &format!("{}", "test2.txt")]);
+        git_rust::RepoRust::add(&add_args).unwrap();
+
+        // Delete the branch file
+        let branch_copy = setup.root.path().join(".git_rust/refs/heads/temp");
+        std::fs::rename(&branch, branch_copy).unwrap();
+        assert!(!branch.exists());
+
+        let result = RepoRust::commit(&commit_args);
+        assert!(result.is_ok());
+        result.unwrap();
+
+        let branch_content_2 = std::fs::read(&branch).unwrap();
+        let commit_2 = str::from_utf8(&branch_content_2).unwrap();
+        assert_ne!(commit_2, commit_1);
+        assert_eq!(commit_2.len(), 40);
     });
 }

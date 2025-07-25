@@ -39,7 +39,7 @@ impl RepoRust {
             .file_name()
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid path"))?
             .into();
-        let repo = Arc::new(RepoRust {
+        let repo = Arc::new(Self {
             absolute_path: path_buf,
             root_path: root,
         });
@@ -205,7 +205,7 @@ impl RepoRust {
             .unwrap_or_default();
         let message = args
             .get_one::<String>("message")
-            .unwrap_or(&"".into())
+            .unwrap_or(&String::new())
             .to_owned();
         let commit = Commit::encode(&hash, commit, &message)?;
         commit.write_commit_to_file()?;
@@ -216,11 +216,16 @@ impl RepoRust {
         // TODO Add the -a flag
         let message = args
             .get_one::<String>("message")
-            .unwrap_or(&"".into())
+            .unwrap_or(&String::new())
             .to_owned();
 
         // Build the current index. Get trees and the hash for the root tree.
-        let (trees, new_tree_hash_bytes) = Tree::encode_object()?;
+        let (trees, new_tree_hash_bytes) = Tree::encode_object().map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Index file not found. Please use use add to track",
+            )
+        })?;
         let new_tree_hash = hex::encode(new_tree_hash_bytes);
         // Get commit hash from head. Early return if a detached head. TODO
 

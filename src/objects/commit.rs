@@ -58,7 +58,7 @@ impl Autors {
         let timestamp: i64 = components.next()?.parse().ok()?;
         let timezone = components.next()?.to_string();
 
-        Some(Autors {
+        Some(Self {
             name,
             email,
             timestamp,
@@ -88,12 +88,12 @@ impl Commit {
 
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut contents: Vec<u8> = vec![];
-        contents.extend_from_slice("tree ".as_bytes());
+        contents.extend_from_slice(b"tree ");
         contents.extend_from_slice(self.tree_hash.as_bytes());
         contents.push(b'\n');
         if !self.parents_hash.is_empty() {
             for hash in &self.parents_hash {
-                contents.extend_from_slice("parent ".as_bytes());
+                contents.extend_from_slice(b"parent ");
                 contents.extend_from_slice(hash.as_bytes());
                 contents.push(b'\n');
             }
@@ -111,8 +111,8 @@ impl Commit {
         let root = &RepoRust::get_root().absolute_path;
         let head_path = root.join(BASE_DIR).join("HEAD");
         let head_bytes = std::fs::read(head_path)?;
-        let head_str = String::from_utf8(head_bytes.to_vec()).unwrap();
-        Ok(head_str)
+        let head_str = str::from_utf8(&head_bytes).unwrap();
+        Ok(head_str.into())
     }
 
     // Returns Ok() where some is the relative path to the branch file. Which may or may not exist yet.
@@ -120,7 +120,7 @@ impl Commit {
     pub fn get_branch_from_head(head_str: &str) -> std::io::Result<PathBuf> {
         let root: &PathBuf = &RepoRust::get_root().absolute_path;
         if !head_str.starts_with("ref: ") {
-            std::io::Error::other("Detached head. Not implemented");
+            return Err(std::io::Error::other("Detached head. Not implemented"));
         }
         let branch = &head_str["refs: ".len() - 1..];
         let branch = branch.strip_suffix('\n').unwrap_or(branch);
@@ -148,7 +148,7 @@ impl Commit {
 
     // Returns the name of the branch updated
     pub fn update_branch_hash(hash: &str) -> std::io::Result<String> {
-        let head_str = Commit::read_head()?;
+        let head_str = Self::read_head()?;
         let branch_path = Self::get_branch_from_head(&head_str)
             .ok()
             .ok_or_else(|| std::io::Error::other("Detached head. Not implemented"))?;
@@ -162,7 +162,7 @@ impl Commit {
     }
 
     pub fn get_tree_from_commit(commit: &str) -> std::io::Result<String> {
-        let commit = Commit::decode(commit)?;
+        let commit = Self::decode(commit)?;
         Ok(commit.tree_hash)
     }
 
@@ -173,7 +173,7 @@ impl Commit {
                 std::io::ErrorKind::InvalidInput,
                 "No tree provided",
             ));
-        };
+        }
         objects::get_object_path(tree_hash).ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "Tree object not found")
         })?;
@@ -188,10 +188,10 @@ impl Commit {
         // Check parents have no duplicates
         let mut parents_hash: Vec<String> = Vec::new();
         for hash in commit {
-            if !parents_hash.contains(&hash) {
-                parents_hash.push(hash);
-            } else {
+            if parents_hash.contains(&hash) {
                 println!("error: duplicate parent {hash} ignored");
+            } else {
+                parents_hash.push(hash);
             }
         }
 
@@ -271,11 +271,11 @@ impl Commit {
             .split(|b| *b == b'\n')
             .collect::<Vec<&[u8]>>();
 
-        let mut tree_hash = String::from("");
+        let mut tree_hash = String::new();
         let mut parents_hash: Vec<String> = Vec::new();
         let mut author = Autors::default();
         let mut committer = Autors::default();
-        let mut message = String::from("");
+        let mut message = String::new();
 
         for line in contents {
             if line.is_empty() {
@@ -286,8 +286,8 @@ impl Commit {
                 tree_hash = str::from_utf8(hash_bytes).unwrap().to_string();
             } else if line.starts_with(b"parent ") {
                 let hash_bytes = &line["parent ".len()..];
-                let parent_hash = str::from_utf8(hash_bytes).unwrap().to_string();
-                parents_hash.push(parent_hash);
+                let parent_hash_str = str::from_utf8(hash_bytes).unwrap().to_string();
+                parents_hash.push(parent_hash_str);
             } else if line.starts_with(b"author ") {
                 match Autors::from_bytes(line) {
                     Some(a) => author = a,
@@ -309,7 +309,7 @@ impl Commit {
             }
         }
 
-        Ok(Commit {
+        Ok(Self {
             header,
             tree_hash,
             parents_hash,
