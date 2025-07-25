@@ -95,6 +95,24 @@ committer <name> <<email>> <timestamp> <timezone>\n
 <commit message>
 ```
 
+#### Logic of cargo run commit:
+```text
+1.  run write-tree                  -> get root tree and the hash of the root tree
+    if the index does not exist     -> STOP
+2.  read the HEAD                   -> get the branch
+    if no branch file               -> initial commit. Create the branch file.
+3.  read the branch file            -> get the parent commit
+4.  read the tree hash from the last commit
+5.  evaluate if new tree hash is the same as tree in the last commit
+    if the same                     -> STOP
+6.  write the tree to file
+7.  use commit-tree to create the commit
+8.  write commit to file
+9.  update the branch file
+10. update reflog
+11. print summary
+```
+
 ## The INDEX file (staging area)
 It uses a binary layour (raw bytes) and always big-endian format.
 The index has a header that is 12 bytes, a record of entries (files/blobs) added to the staging area and a checksum (SHA-1) of all the content (header + entries).
