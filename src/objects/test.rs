@@ -2457,8 +2457,7 @@ fn test_write_commit_tree_bad_tree() {
             "Tree object not found".to_string()
         );
 
-        // Provide a random hash
-
+        // Provide duplicate parents
         let parent_commit_1: Vec<String> = Vec::new();
         let message_1 = "This is a test commit 1".to_string();
 

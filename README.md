@@ -80,8 +80,20 @@ Mode is specific to each object
 
 
 ## A Commit file
-Todo
+The information in the commit file is separated by new line characters and all but the message start with a specific word.  
+Between the committer and message, there is an extra line.  
+Lack of a parent SHA indicates it is the initial commit.  
+Multiple SHA's indicate it is a merge commit  
 
+```text
+tree <40-character SHA>\n
+parent <40-character SHA>\n      (optional, can appear multiple times)
+parent <40-character SHA>\n      (optional, for merge commits)
+author <name> <<email>> <timestamp> <timezone>\n
+committer <name> <<email>> <timestamp> <timezone>\n
+\n
+<commit message>
+```
 
 ## The INDEX file (staging area)
 It uses a binary layour (raw bytes) and always big-endian format.

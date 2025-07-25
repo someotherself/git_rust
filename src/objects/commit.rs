@@ -382,6 +382,12 @@ impl std::fmt::Display for Commit {
 
 impl std::fmt::Display for CommitSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "[{} {}] {}", self.branch, self.commit_hash, self.message)
+        writeln!(
+            f,
+            "[{} {}] {}",
+            self.branch,
+            &self.commit_hash[..8],
+            self.message
+        )
     }
 }
