@@ -213,7 +213,6 @@ impl RepoRust {
         Ok(())
     }
 
-    // TODO Crate refs/heads/master if initial commit
     pub fn commit(args: &ArgMatches) -> std::io::Result<()> {
         // TODO Add the -a flag
         let message = args
@@ -224,10 +223,7 @@ impl RepoRust {
         // Build the current index. Get trees and the hash for the root tree.
         let (trees, new_tree_hash_bytes) = Tree::encode_object()?;
         let new_tree_hash = hex::encode(new_tree_hash_bytes);
-        // Get commit hash from head. Early return if a detached head.
-        // let last_branch_commit = Commit::get_branch_commit()?.ok_or_else(|| std::io::Error::other("Detached head. Not implemented"))?;
-        // // Read tree hash from last commit
-        // let last_tree_hash = Commit::get_tree_from_commit(&last_branch_commit)?;
+        // Get commit hash from head. Early return if a detached head. TODO
 
         // Read head and get path.
         let head_str = Commit::read_head()?;
@@ -242,14 +238,13 @@ impl RepoRust {
             // Read it and push to parent_branches
             let parent_hash = Commit::get_branch_commit()?;
             parent_commits.push(parent_hash.clone());
-            let parent_commit = Commit::decode(&parent_hash)?;
-            let last_tree_hash = parent_commit.tree_hash;
+            let last_tree_hash = Commit::get_tree_from_commit(&parent_hash)?;
 
             // Use root tree hash to check if there's anything new in staging
             if new_tree_hash == last_tree_hash {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
-                    "Commit object not found",
+                    "Nothing added to commit but untracked files present (use add to track)",
                 ));
             };
         }
