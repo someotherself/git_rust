@@ -1,10 +1,10 @@
-# 🦀 git-rust — A Git CLI clone Written in Rust
+#  git-rust — A Git CLI clone Written in Rust 🦀
 
 git-rust is a simplified Git implementation built from scratch in Rust. It mimics core Git functionality of basic commands, listed below. It serves as a learning project.
 
 This project explores how Git works under the hood — from creating repositories and hashing objects, to writing Git-compliant blob files and reading them back from the .git/objects directory.
 
-# ✨ Current Features and flags implemented
+# Current Features and flags implemented
 
     cargo run init          
                             — Initialize a new Git-like repository. Does not re-initialize a repo.
@@ -44,7 +44,7 @@ This project explores how Git works under the hood — from creating repositorie
                             - flag -m can be used only once.
 
 
-# 🛠️ Formatting helper 
+# Formatting helper
 
 ## Object files (blobs, tree and commits)
 All blob, tree and commit files are tested to be compatible with git.
