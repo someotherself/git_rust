@@ -194,7 +194,6 @@ impl Tree {
             match mode.as_str() {
                 "100644" => objecttype = ObjectType::Blob,
                 "40000" => objecttype = ObjectType::Tree,
-                "160000" => objecttype = ObjectType::Commit,
                 _ => {
                     panic!("Invalid object type.")
                 }
