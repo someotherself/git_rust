@@ -2,7 +2,7 @@
 
 git-rust is a simplified Git implementation built from scratch in Rust. It mimics core Git functionality of basic commands, listed below. It serves as a learning project.
 
-This project explores how Git works under the hood — from creating repositories and hashing objects, to writing Git-compliant blob files and reading them back from the .git/objects directory.
+This project explores how Git works under the hood — from creating repositories and hashing objects, to writing Git-compliant object files and reading them back from the .git_rust/objects directory.
 
 # Current Features and flags implemented
 
@@ -21,7 +21,7 @@ This project explores how Git works under the hood — from creating repositorie
                             - Decode and print stored objects
                             - flag -p (optional) - different from git
                                 Blobs:      Always prints raw bytes to stdout
-                                Trees:      Without pretty pring, will send raw bytes to stdout
+                                Trees:      Without pretty print, will send raw bytes to stdout
                                 Commits:    Always pretty print
 
     cargo run ls-files
@@ -51,10 +51,10 @@ All blob, tree and commit files are tested to be compatible with git.
 Below is meant to be as documentation. Should be matching git to the best of my research.
 
 All git object files are preceded by a header. They are all compressed with zlib.
-A header contains the name of the object, followed by the size of te content (number of bytes) and null terminated.
-Example: "blob [size]\0
-Example: "tree [size]\0
-Example: "commit [size]\0
+A header contains the name of the object, followed by the size of the content (number of bytes) and null terminated.  
+Example: "blob [size]\0  
+Example: "tree [size]\0  
+Example: "commit [size]\0  
 
 ## A Blob file
 The content is simply the contents of the original file.
@@ -126,7 +126,7 @@ Example of the Header:
 | **Field**     | **Size (Bytes)** | **Description**                                       | **Example (Hex)**                    |
 | ------------- | ---------------- | ----------------------------------------------------- | ------------------------------------ |
 | `dircache DIRC`       | 4                | Always set as "DIRC"                     | `44 49 52 43`                        |
-| `Version` | 4                | Version 2, 3 or 4. 2 is most common                            | `00 00 00 00`                        |
+| `Version` | 4                | Version 2, 3 or 4. 2 is most common                            | `00 00 00 02`                        |
 | `Entries`       | 4                | Number of entries                    | `00 00 00 20`                        |
 
 
