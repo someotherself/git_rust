@@ -273,4 +273,14 @@ impl RepoRust {
         println!("{commit_summary}");
         Ok(())
     }
+
+    pub fn clone(args: &ArgMatches) -> std::io::Result<()> {
+        let _url = args.get_one::<String>("url").unwrap().to_owned();
+        let dir = args.get_one::<String>("directory").unwrap().to_owned();
+
+        // Create the dir
+        std::fs::create_dir(Path::new(&dir))?;
+
+        todo!()
+    }
 }

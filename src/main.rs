@@ -15,7 +15,7 @@ fn main() -> std::io::Result<()> {
         .subcommand(Command::new("init").about("Create an empty git directory"))
         // git cat-file
         .subcommand(
-            Command::new("cat-file")
+            Command::new("cat-file").about("Provide contents or details of repository objects")
                 .arg(
                     Arg::new("pretty")
                         .short('p')
@@ -92,6 +92,22 @@ fn main() -> std::io::Result<()> {
                 .short('m')
                 .value_name("MESSAGE")
                 .help("Add a commit message.")))
+        .subcommand(
+            Command::new("clone")
+                .about("Clone a repository.")
+                .arg(
+                    Arg::new("url")
+                        .required(true)
+                        .value_name("URL")
+                        .help("The URL for the reposity."),
+                )
+                .arg(
+                    Arg::new("directory")
+                        .required(true)
+                        .value_name("DIR")
+                        .help("The local directory you wish the clone into."),
+                ),
+        )
         .get_matches();
 
     match matches.subcommand() {
@@ -106,6 +122,7 @@ fn main() -> std::io::Result<()> {
         Some(("write-tree", args)) => RepoRust::write_tree(args)?,
         Some(("commit-tree", args)) => RepoRust::commit_tree(args)?,
         Some(("commit", args)) => RepoRust::commit(args)?,
+        Some(("clone", args)) => RepoRust::clone(args)?,
         Some((_, _)) | None => {}
     }
     Ok(())
