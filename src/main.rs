@@ -1,6 +1,7 @@
 mod git_rust;
 mod index;
 mod objects;
+mod requests;
 
 #[cfg(test)]
 mod test_common;
@@ -108,6 +109,28 @@ fn main() -> std::io::Result<()> {
                         .help("The local directory you wish the clone into."),
                 ),
         )
+                .subcommand(
+            Command::new("fetch")
+                .about("Clone a repository.")
+                .arg(
+                    Arg::new("url")
+                        .required(true)
+                        .value_name("URL")
+                        .help("The URL for the reposity."),
+                )
+                .arg(
+                    Arg::new("branch")
+                        .required(true)
+                        .value_name("BRANCH")
+                        .help("The branch you wish to fetch from."),
+                )
+                .arg(
+                    Arg::new("directory")
+                        .required(true)
+                        .value_name("DIR")
+                        .help("The local directory you wish the clone into."),
+                ),
+        )
         .get_matches();
 
     match matches.subcommand() {
@@ -122,6 +145,7 @@ fn main() -> std::io::Result<()> {
         Some(("write-tree", args)) => RepoRust::write_tree(args)?,
         Some(("commit-tree", args)) => RepoRust::commit_tree(args)?,
         Some(("commit", args)) => RepoRust::commit(args)?,
+        Some(("fetch", args)) => RepoRust::fetch(args)?,
         Some(("clone", args)) => RepoRust::clone(args)?,
         Some((_, _)) | None => {}
     }

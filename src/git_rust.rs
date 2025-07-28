@@ -15,6 +15,7 @@ use crate::{
         commit::{Commit, CommitSummary},
         tree::Tree,
     },
+    requests::fetch,
 };
 
 pub const BASE_DIR: &str = ".git_rust";
@@ -274,13 +275,30 @@ impl RepoRust {
         Ok(())
     }
 
+    pub fn fetch(args: &ArgMatches) -> std::io::Result<()> {
+        let url = args.get_one::<String>("url").unwrap().to_owned();
+        let _branch = args.get_one::<String>("branch").unwrap().to_owned();
+        let dir = args.get_one::<String>("directory").unwrap().to_owned();
+
+        // Create the dir
+        let dir_path = Path::new(&dir);
+        if !dir_path.exists() {
+            std::fs::create_dir(Path::new(dir_path))?;
+        }
+
+        fetch(&url, &dir).unwrap();
+        todo!()
+    }
+
     pub fn clone(args: &ArgMatches) -> std::io::Result<()> {
         let _url = args.get_one::<String>("url").unwrap().to_owned();
         let dir = args.get_one::<String>("directory").unwrap().to_owned();
 
         // Create the dir
-        std::fs::create_dir(Path::new(&dir))?;
-
+        let dir_path = Path::new(&dir);
+        if !dir_path.exists() {
+            std::fs::create_dir(Path::new(dir_path))?;
+        }
         todo!()
     }
 }
