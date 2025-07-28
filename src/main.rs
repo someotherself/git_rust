@@ -95,7 +95,7 @@ fn main() -> std::io::Result<()> {
                 .help("Add a commit message.")))
         .subcommand(
             Command::new("clone")
-                .about("Clone a repository.")
+                .about("")
                 .arg(
                     Arg::new("url")
                         .required(true)
@@ -111,7 +111,7 @@ fn main() -> std::io::Result<()> {
         )
                 .subcommand(
             Command::new("fetch")
-                .about("Clone a repository.")
+                .about("Download objects and refs from a repository")
                 .arg(
                     Arg::new("url")
                         .required(true)
