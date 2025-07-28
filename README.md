@@ -43,6 +43,11 @@ This project explores how Git works under the hood — from creating repositorie
                             - flag -a not yet implemented. Changes need to be staged separately.
                             - flag -m can be used only once.
 
+    cargo run fetch <url> <branch> <directory> (work in progress)
+                            - Download objects and refs from a repository
+
+    cargo run clone <url> <directory> (work in progress)
+                            - Clone a repository.
 
 # Formatting helper
 
