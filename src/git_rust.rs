@@ -281,10 +281,10 @@ impl RepoRust {
         let dir = args.get_one::<String>("directory").unwrap().to_owned();
 
         // Create the dir
-        let dir_path = Path::new(&dir);
-        if !dir_path.exists() {
-            std::fs::create_dir(Path::new(dir_path))?;
-        }
+        // let dir_path = Path::new(&dir);
+        // if !dir_path.exists() {
+        //     std::fs::create_dir(Path::new(dir_path))?;
+        // }
 
         fetch(&url, &dir).unwrap();
         todo!()

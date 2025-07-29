@@ -1,17 +1,35 @@
-use crate::requests::{UploadPack, protocol::get_request};
+use crate::requests::{
+    GitRef, UploadPack,
+    protocol::{get_request, post_request},
+};
 
-pub fn fetch(url: &str, _dir: &str) -> Result<(), reqwest::Error> {
-    let payload = get_request(url)?;
+// Process of making a fetch request
+// 1. GET /info/refs?service=git-upload-pack
+//      -> Receive the Git reference advertisement with all the refs and and capabilities
+// 2. Parse the refs and capabilities
+// 3. Create a POST payload with want and do
+// 4. POST the payload to /git-upload-pack (The actual fetch request)
+//      -> Receive the commit and objects
+// 5. Decode the response
+// 6. Extract and process .pack file contents (objects, commits, etc.)
+pub fn fetch(url: &str, _dir: &str) -> std::io::Result<()> {
+    let payload = get_request(url)
+        .map_err(|_| std::io::Error::other("Error fetching the git-upload-pack"))?;
     let content = read_pkt_lines(&payload);
-    for line in &content {
+    for line in &content[..25] {
         let text = String::from_utf8(line.to_vec()).unwrap();
         dbg!(text);
     }
 
-    UploadPack::from_response(content);
+    let uploadpack = UploadPack::from_response(content);
 
-    // let want_payload = write_pkt_lines();
-    // post_request(url, want_payload).unwrap();
+    if uploadpack.head.is_none() {
+        return Err(std::io::Error::other("missing HEAD"));
+    }
+    let want_commits = vec![uploadpack.head.unwrap()];
+
+    let want_payload = write_pkt_lines(want_commits);
+    let _object_payload = post_request(url, want_payload).unwrap();
 
     Ok(())
 }
@@ -62,15 +80,22 @@ fn read_pkt_lines(data: &[u8]) -> Vec<Vec<u8>> {
 // 0009done\n
 // 0000
 #[allow(dead_code)]
-fn write_pkt_lines(hash: &str) -> Vec<u8> {
+fn write_pkt_lines(commits: Vec<GitRef>) -> Vec<u8> {
     let mut payload = Vec::new();
-    let capabilities = "multi_ack thin-pack ofs-delta";
-    // let capabilities = "multi_ack thin-pack side-band side-band-64k ofs-delta";
+    let capabilities = "multi_ack thin-pack no-progress side-band side-band-64k ofs-delta";
 
-    let want = format!("want {hash} {capabilities}\n");
-    let want_len = 4 + want.len();
-    payload.extend_from_slice(format!("{want_len:04x}").as_bytes());
-    payload.extend_from_slice(want.as_bytes());
+    for (i, commit) in commits.iter().enumerate() {
+        let want = if i == 0 {
+            format!("want {} {capabilities}\n", commit.hash)
+        } else {
+            format!("want {}\n", commit.hash)
+        };
+
+        let want_len = 4 + want.len();
+        payload.extend_from_slice(format!("{want_len:04x}").as_bytes());
+        payload.extend_from_slice(want.as_bytes());
+    }
+
     payload.extend_from_slice(b"0000");
 
     let done = "done\n";
