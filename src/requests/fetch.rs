@@ -1,0 +1,84 @@
+use crate::requests::{UploadPack, protocol::get_request};
+
+pub fn fetch(url: &str, _dir: &str) -> Result<(), reqwest::Error> {
+    let payload = get_request(url)?;
+    let content = read_pkt_lines(&payload);
+    for line in &content {
+        let text = String::from_utf8(line.to_vec()).unwrap();
+        dbg!(text);
+    }
+
+    UploadPack::from_response(content);
+
+    // let want_payload = write_pkt_lines();
+    // post_request(url, want_payload).unwrap();
+
+    Ok(())
+}
+
+// Parsing the Pkt-Line Format. Example:
+// 001e# service=git-upload-pack\n
+// 0000 -> Called a flush packet. Must be skipped
+// LLLL<line1\n> -> LLLL = length of data
+// LLLL<line2\n>
+// LLLL<line3\n>
+// LLLL<line4\n>
+// 0000
+// The length of the data includes the 4 bytes that hold the size
+// Example: "001e# service=git-upload-pack\n".len() = 30 / 001e = 30
+fn read_pkt_lines(data: &[u8]) -> Vec<Vec<u8>> {
+    let mut i = 0;
+    let mut lines = Vec::new();
+
+    // Skip reading the 4 bytes containing the length
+    while i + 4 <= data.len() {
+        let data_length = std::str::from_utf8(&data[i..i + 4]).unwrap();
+        // Check for flush packets
+        if data_length == "0000" {
+            i += 4;
+            continue;
+        }
+
+        // Converts the data_length(as str) to a usize
+        let len = usize::from_str_radix(data_length, 16).unwrap();
+        if len < 4 || i + len > data.len() {
+            break;
+        }
+
+        //      001e# service=git-upload-pack\n
+        //         ↑                          ↑
+        //  i + 4 ─┘                          └─ i + 0x001e (length in hex)
+        let payload = data[i + 4..i + len].to_vec();
+        lines.push(payload);
+        i += len;
+    }
+    lines
+}
+
+// Example of formatting for the pakt payload
+// 003fwant <hash1> multi_ack thin-pack side-band side-band-64k ofs-delta\0
+// 003fwant <hash2>
+// 0000
+// 0009done\n
+// 0000
+#[allow(dead_code)]
+fn write_pkt_lines(hash: &str) -> Vec<u8> {
+    let mut payload = Vec::new();
+    let capabilities = "multi_ack thin-pack ofs-delta";
+    // let capabilities = "multi_ack thin-pack side-band side-band-64k ofs-delta";
+
+    let want = format!("want {hash} {capabilities}\n");
+    let want_len = 4 + want.len();
+    payload.extend_from_slice(format!("{want_len:04x}").as_bytes());
+    payload.extend_from_slice(want.as_bytes());
+    payload.extend_from_slice(b"0000");
+
+    let done = "done\n";
+    let done_len = done.len() + 4;
+    payload.extend_from_slice(format!("{done_len:04x}").as_bytes());
+    payload.extend_from_slice(done.as_bytes());
+
+    payload.extend_from_slice(b"0000");
+
+    payload
+}

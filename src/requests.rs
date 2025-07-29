@@ -1,135 +1,136 @@
-use reqwest::blocking::Client;
-use std::io::Read;
+pub mod fetch;
+mod protocol;
 
-pub fn get_request(url: &str) -> Result<Vec<u8>, reqwest::Error> {
-    let url = format!("{url}/info/refs?service=git-upload-pack");
-    let client = Client::new();
-
-    let mut res = client.get(url).header("User-Agent", "git/2.0").send()?;
-
-    let mut body = Vec::new();
-    res.read_to_end(&mut body)
-        .expect("Could not write data received from git.");
-
-    Ok(body)
-}
-//
-pub fn post_request(url: &str, payload: Vec<u8>) -> Result<Vec<u8>, reqwest::Error> {
-    let url = format!("{url}.git/git-upload-pack");
-    dbg!(&url);
-    let content = "application/x-git-upload-pack-request";
-    let client = Client::new();
-
-    let res = client
-        .post(&url)
-        .header(reqwest::header::CONTENT_TYPE, content)
-        .header(
-            reqwest::header::ACCEPT,
-            "application/x-git-upload-pack-result",
-        )
-        // .header(reqwest::header::CACHE_CONTROL, "no-cache")
-        .body(payload)
-        .send()?;
-
-    dbg!(res.status());
-
-    let body = res.bytes()?.to_vec();
-
-    dbg!(body.len());
-    todo!()
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct UploadPack {
+    pub head: Option<GitRef>,
+    pub refs: Vec<GitRef>,
+    pub tags: Vec<GitRef>,
+    // Server specific (PR commits)
+    pub pulls: Vec<GitRef>,
+    // Optional
+    pub symrefs: Vec<GitRef>,
+    pub capabilities: Vec<String>,
 }
 
-pub fn fetch(url: &str, _dir: &str) -> Result<(), reqwest::Error> {
-    let payload = get_request(url)?;
-    let content = read_pkt_lines(&payload);
-    for line in &content[0..10] {
-        let text = String::from_utf8(line.to_vec()).unwrap();
-        dbg!(text);
+#[allow(unused_mut)]
+impl UploadPack {
+    fn from_response(res: Vec<Vec<u8>>) -> Self {
+        let mut head: Option<GitRef> = None;
+        let mut refs: Vec<GitRef> = Vec::new();
+        let mut tags: Vec<GitRef> = Vec::new();
+        let mut pulls: Vec<GitRef> = Vec::new();
+        let mut symrefs: Vec<GitRef> = Vec::new();
+        let mut capabilities: Vec<String> = Vec::new();
+        for line in res {
+            let line = String::from_utf8(line).unwrap();
+            let comps = line.splitn(2, ' ').collect::<Vec<&str>>();
+            if comps.len() == 1 {
+                dbg!("Invalid upload-pack response line");
+                continue;
+            }
+            match comps[1] {
+                s if s.starts_with("#") => {
+                    continue;
+                }
+                s if s.starts_with("HEAD") => {
+                    head = Some(GitRef::read_head(s));
+                    capabilities = GitRef::read_capabilities(s);
+                }
+                s if s.starts_with("refs/heads") => {
+                    refs = GitRef::read_refs(s);
+                }
+                s if s.starts_with("refs/tags") => {
+                    tags = GitRef::read_refs(s);
+                }
+                s if s.starts_with("refs/pull") => {
+                    pulls = GitRef::read_refs(s);
+                }
+                // Optional
+                // Looks at the HEAD line, for symrefs that do not start with "symref=HEAD:"
+                s if s.starts_with("refs/symref") => {}
+                _ => {}
+            }
+        }
+        Self {
+            head,
+            refs,
+            tags,
+            pulls,
+            symrefs,
+            capabilities,
+        }
     }
-    let head = &content[1];
-    let (hash, _head) = fetch_head(head);
-    let want_payload = write_pkt_lines(hash);
-    post_request(url, want_payload).unwrap();
-
-    Ok(())
 }
 
-fn fetch_head(line: &[u8]) -> (&str, &str) {
-    let line_str = str::from_utf8(line).unwrap();
-    let mut head_pos = line_str.splitn(2, "symref=HEAD:");
-
-    let hash = &head_pos.next().unwrap()[..40];
-    let head_ref = head_pos.next().unwrap();
-    let head_ref_finish = head_ref.find(' ').unwrap();
-    let head_ref = &head_ref[..head_ref_finish];
-    (hash, head_ref)
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct GitRef {
+    pub name: String,
+    pub hash: String,
 }
 
-// Parsing the Pkt-Line Format. Example:
-// 001e# service=git-upload-pack\n
-// 0000 -> Called a flush packet. Must be skipped
-// LLLL<line1\n> -> LLLL = length of data
-// LLLL<line2\n>
-// LLLL<line3\n>
-// LLLL<line4\n>
-// 0000
-//
-// The length of the data includes the 4 bytes that hold the size
-// Example: "001e# service=git-upload-pack\n".len() = 30 / 001e = 30
-fn read_pkt_lines(data: &[u8]) -> Vec<Vec<u8>> {
-    let mut i = 0;
-    let mut lines = Vec::new();
+// Example HEAD response:
+// <SHA1> HEAD\0multi_ack thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-relative no-progress
+// include-tag multi_ack_detailed allow-tip-sha1-in-want allow-reachable-sha1-in-want no-done symref=HEAD:refs/heads/main filter
+// object-format=sha1 agent=git/github-5a2d4c40a633-Linux\n
+impl GitRef {
+    // Used for all refs, tags, pulls etc
+    fn read_refs(res: &str) -> Vec<GitRef> {
+        let mut refs = Vec::new();
 
-    // Skip reading the 4 bytes containing the length
-    while i + 4 <= data.len() {
-        let data_length = std::str::from_utf8(&data[i..i + 4]).unwrap();
-        // Check for flush packets
-        if data_length == "0000" {
-            i += 4;
-            continue;
+        for line in res.lines() {
+            // Each line is: "<hash> <refname>"
+            let components: Vec<&str> = line.splitn(2, ' ').collect();
+            if components.len() != 2 {
+                continue; // skip invalid lines
+            }
+
+            let hash = components[0].to_string();
+            let name = components[1].trim().to_string();
+
+            // Ignore symref and capabilities lines here
+            if name.starts_with("symref=") || name.starts_with('#') {
+                continue;
+            }
+
+            refs.push(GitRef { name, hash });
         }
 
-        // Converts the data_length(as str) to a usize
-        let len = usize::from_str_radix(data_length, 16).unwrap();
-        if len < 4 || i + len > data.len() {
-            break;
-        }
-
-        //      001e# service=git-upload-pack\n
-        //         ↑                         ↑
-        //  i + 4 ─┘                         └─ i + 0x001e (length in hex)
-        let payload = data[i + 4..i + len].to_vec();
-        lines.push(payload);
-        i += len;
+        refs
     }
-    lines
-}
 
-// Example of formatting for the pakt payload
-// 003fwant <hash1> multi_ack thin-pack side-band side-band-64k ofs-delta\0
-// 0000
-// 003fwant <hash2>
-// 0000
-// 0009done\n
-// 0000
-fn write_pkt_lines(hash: &str) -> Vec<u8> {
-    let mut payload = Vec::new();
-    let capabilities = "multi_ack thin-pack side-band side-band-64k ofs-delta";
+    fn read_head(res: &str) -> Self {
+        let components = res.splitn(2, " ").collect::<Vec<_>>();
+        let hash = components[0].to_string();
+        let comps = components[1]
+            .split(' ')
+            .filter(|x| x.starts_with("symref=HEAD:"))
+            .collect::<Vec<&str>>()[0];
+        dbg!(comps);
+        let name = comps.strip_prefix("symref=HEAD:").unwrap().to_string();
+        dbg!(&hash);
+        dbg!(&name);
+        Self { name, hash }
+    }
 
-    let want = format!("want {hash} {capabilities}\n");
-    dbg!(&want);
-    let want_len = 4 + want.len();
-    dbg!(&want_len);
-    payload.extend_from_slice(format!("{want_len:04x}").as_bytes());
-    payload.extend_from_slice(want.as_bytes());
-    payload.extend_from_slice(b"0000");
+    fn read_capabilities(res: &str) -> Vec<String> {
+        let mut capabilities = Vec::new();
 
-    let done = "done\n";
-    let done_len = done.len() + 4;
-    payload.extend_from_slice(format!("{done_len:04x}").as_bytes());
-    payload.extend_from_slice(done.as_bytes());
+        let mut parts = res.splitn(2, '\0');
+        parts.next();
+        let caps_str = parts.next().expect("Invalid capabilities response");
 
-    payload.extend_from_slice(b"0000");
-
-    payload
+        for cap in caps_str.split(' ') {
+            if cap.is_empty() {
+                continue;
+            }
+            if cap.starts_with("symref") {
+                continue;
+            }
+            capabilities.push(cap.trim_end_matches('\n').to_string());
+        }
+        capabilities
+    }
 }

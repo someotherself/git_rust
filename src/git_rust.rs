@@ -15,7 +15,7 @@ use crate::{
         commit::{Commit, CommitSummary},
         tree::Tree,
     },
-    requests::fetch,
+    requests::fetch::fetch,
 };
 
 pub const BASE_DIR: &str = ".git_rust";
