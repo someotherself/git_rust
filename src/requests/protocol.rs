@@ -39,17 +39,5 @@ pub fn post_request(url: &str, payload: Vec<u8>) -> Result<Vec<u8>, reqwest::Err
 
     let body = res.bytes()?.to_vec();
 
-    dbg!(body.len());
-    let pattern1 = b"PACK";
-    let pack_pos = body
-        .windows(pattern1.len())
-        .position(|p| p == pattern1)
-        .unwrap();
-
-    let packfile = &body[pack_pos..];
-    let version = u32::from_be_bytes([packfile[4], packfile[5], packfile[6], packfile[7]]);
-    let obj_count = u32::from_be_bytes([packfile[8], packfile[9], packfile[10], packfile[11]]);
-    dbg!(version);
-    dbg!(obj_count);
-    todo!()
+    Ok(body)
 }

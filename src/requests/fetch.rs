@@ -16,10 +16,10 @@ pub fn fetch(url: &str, _dir: &str) -> std::io::Result<()> {
     let payload = get_request(url)
         .map_err(|_| std::io::Error::other("Error fetching the git-upload-pack"))?;
     let content = read_pkt_lines(&payload);
-    for line in &content[..25] {
-        let text = String::from_utf8(line.to_vec()).unwrap();
-        dbg!(text);
-    }
+    // for line in &content[..5] {
+    //     let text = String::from_utf8(line.to_vec()).unwrap();
+    //     dbg!(text);
+    // }
 
     let uploadpack = UploadPack::from_response(content);
 
@@ -29,8 +29,8 @@ pub fn fetch(url: &str, _dir: &str) -> std::io::Result<()> {
     let want_commits = vec![uploadpack.head.unwrap()];
 
     let want_payload = write_pkt_lines(want_commits);
-    let _object_payload = post_request(url, want_payload).unwrap();
-
+    let object_payload = post_request(url, want_payload).unwrap();
+    let _packfile_bytes = extract_packfile(&object_payload);
     Ok(())
 }
 
@@ -106,4 +106,31 @@ fn write_pkt_lines(commits: Vec<GitRef>) -> Vec<u8> {
     payload.extend_from_slice(b"0000");
 
     payload
+}
+
+fn extract_packfile(mut data: &[u8]) -> Vec<u8> {
+    let mut packfile = Vec::new();
+
+    while !data.is_empty() {
+        if data.len() < 4 {
+            break;
+        }
+
+        let len_str = str::from_utf8(&data[..4]).unwrap();
+        let len = usize::from_str_radix(len_str, 16).unwrap();
+        if len == 0 {
+            break;
+        }
+
+        let band = data[4];
+        let payload = &data[5..len];
+
+        if band == 1 {
+            packfile.extend_from_slice(payload);
+        }
+
+        data = &data[len..];
+    }
+
+    packfile
 }

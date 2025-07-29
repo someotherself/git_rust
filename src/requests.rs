@@ -27,7 +27,7 @@ impl UploadPack {
             let line = String::from_utf8(line).unwrap();
             let comps = line.splitn(2, ' ').collect::<Vec<&str>>();
             if comps.len() == 1 {
-                dbg!("Invalid upload-pack response line");
+                eprint!("Invalid upload-pack response line");
                 continue;
             }
             match comps[1] {
@@ -35,17 +35,17 @@ impl UploadPack {
                     continue;
                 }
                 s if s.starts_with("HEAD") => {
-                    head = Some(GitRef::read_head(s));
-                    capabilities = GitRef::read_capabilities(s);
+                    head = Some(GitRef::read_head(&line));
+                    capabilities = GitRef::read_capabilities(&line);
                 }
                 s if s.starts_with("refs/heads") => {
-                    refs = GitRef::read_refs(s);
+                    refs = GitRef::read_refs(&line);
                 }
                 s if s.starts_with("refs/tags") => {
-                    tags = GitRef::read_refs(s);
+                    tags = GitRef::read_refs(&line);
                 }
                 s if s.starts_with("refs/pull") => {
-                    pulls = GitRef::read_refs(s);
+                    pulls = GitRef::read_refs(&line);
                 }
                 // Optional
                 // Looks at the HEAD line, for symrefs that do not start with "symref=HEAD:"
@@ -102,6 +102,7 @@ impl GitRef {
     }
 
     fn read_head(res: &str) -> Self {
+        dbg!(res);
         let components = res.splitn(2, " ").collect::<Vec<_>>();
         let hash = components[0].to_string();
         let comps = components[1]
