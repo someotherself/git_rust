@@ -81,16 +81,14 @@ impl GitRef {
         let mut refs = Vec::new();
 
         for line in res.lines() {
-            // Each line is: "<hash> <refname>"
             let components: Vec<&str> = line.splitn(2, ' ').collect();
             if components.len() != 2 {
-                continue; // skip invalid lines
+                continue;
             }
 
             let hash = components[0].to_string();
             let name = components[1].trim().to_string();
 
-            // Ignore symref and capabilities lines here
             if name.starts_with("symref=") || name.starts_with('#') {
                 continue;
             }
@@ -134,4 +132,12 @@ impl GitRef {
         }
         capabilities
     }
+}
+
+#[derive(Debug)]
+#[allow(dead_code)]
+struct GitObject {
+    pub object_type: u8,
+    pub size: usize,
+    pub data: Vec<u8>,
 }

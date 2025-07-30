@@ -1,5 +1,10 @@
+use std::io::{Cursor, Read};
+
+use byteorder::{BigEndian, ReadBytesExt};
+use flate2::read::ZlibDecoder;
+
 use crate::requests::{
-    GitRef, UploadPack,
+    GitObject, GitRef, UploadPack,
     protocol::{get_request, post_request},
 };
 
@@ -30,7 +35,10 @@ pub fn fetch(url: &str, _dir: &str) -> std::io::Result<()> {
 
     let want_payload = write_pkt_lines(want_commits);
     let object_payload = post_request(url, want_payload).unwrap();
-    let _packfile_bytes = extract_packfile(&object_payload);
+    let packfile_bytes = extract_packfile(&object_payload);
+
+    let objects = unpack_packfile(&packfile_bytes).unwrap();
+    dbg!(objects.len());
     Ok(())
 }
 
@@ -108,6 +116,15 @@ fn write_pkt_lines(commits: Vec<GitRef>) -> Vec<u8> {
     payload
 }
 
+// Reads the upload-pack stream
+// The fetch response is sent in side-band format (RFC 8484)
+// Response is in this format:
+// 0032 01 <packfile-bytes...>
+// 000a 02 Counting objects...
+// 0000
+// <size> <identifier> <data>
+// Idenfitied: 1 - packfile data / 2 - progress messages / 3 - error
+// Extract the raw packfile -
 fn extract_packfile(mut data: &[u8]) -> Vec<u8> {
     let mut packfile = Vec::new();
 
@@ -116,12 +133,14 @@ fn extract_packfile(mut data: &[u8]) -> Vec<u8> {
             break;
         }
 
+        // Get the 4 bytes containing the size
         let len_str = str::from_utf8(&data[..4]).unwrap();
         let len = usize::from_str_radix(len_str, 16).unwrap();
         if len == 0 {
             break;
         }
 
+        // Get the 1 byte containing the identifier (band)
         let band = data[4];
         let payload = &data[5..len];
 
@@ -133,4 +152,105 @@ fn extract_packfile(mut data: &[u8]) -> Vec<u8> {
     }
 
     packfile
+}
+
+// Process the raw packfile
+// The format of the raw packfile:
+// 4 bytes - the word "PACK"
+// 4 bytes - the version. Usually 0002
+// 4 bytes - number of objects (big endian)
+// the rest - Object entries
+// last 20 bytes - SHA-1 checksum
+//
+// Format of object entries:
+// Header + Zlib compressed data
+// Header:
+// 7 6 5 4 3 2 1 0
+// C T T T S S S S
+// bites 0-3 - Size bits (S)
+// bites 4-6 - Object type (T)
+// bit   7   - Continuation bit (C)
+// Object types: 1 = commit / 2- tree / 3 - blob / 4 - tag / 6 - ofs-delta / 7 ref-delta
+//
+// Example 1 - 0b01100010
+// bites 0-3 -> 0100 (2 in decimal) -> check the continuation bit
+// bites 4-6 -> 011 -> (3 in decimal) Blob
+// bit   7   -> 0 -> stop reading header
+// When continuation bit 1 you, read another 7 bits of the size from the next byte
+// Example 2 - 0b111110100
+// Next byte :
+// bit   7   - another continuation bit
+// bites 0-6 - next 7 bits of the size value
+// Calculating the size. Example:
+// Byte 1: 0b10010011 -> size bits 0b0011 (3 in decimal)
+// Byte 2: 0b10000101 -> size bits 0b0000101 (5 in decimal)
+// Byte 3: 0b00000010 -> size bits 0b0000010 (2 in decimal)
+// Shifting:
+// 17 16 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00
+//  0  0  0  0  0  1  0  0  0  0  0  1  0  1  0  0  1  1 -> 4179 in decimal
+// |Bytes 3              |Byte 2               |Byte 1  |
+//    (0b0000010 << 11)  +   (0000101 << 4)    +  0011
+fn unpack_packfile(packfile: &[u8]) -> std::io::Result<Vec<GitObject>> {
+    let mut cursor = Cursor::new(packfile);
+
+    let mut pack = [0u8; 4];
+    cursor.read_exact(&mut pack)?;
+
+    if &pack != b"PACK" {
+        return Err(std::io::Error::other("Invalid packfile header"));
+    }
+
+    let version = cursor.read_u32::<BigEndian>()?;
+    if version != 2 && version != 3 {
+        return Err(std::io::Error::other("Invalid packfile version"));
+    }
+
+    let object_count = cursor.read_u32::<BigEndian>()?;
+    dbg!(object_count);
+    let mut objects = Vec::new();
+
+    for _ in 0..object_count {
+        let (object_type, size) = read_type_and_size(&mut cursor)?;
+        let mut zlib = ZlibDecoder::new(&mut cursor);
+        let mut data = Vec::new();
+        zlib.read_to_end(&mut data).unwrap();
+
+        objects.push(GitObject {
+            object_type,
+            size,
+            data,
+        });
+
+        let used = pack.len() - cursor.get_ref().len();
+        cursor.set_position(used as u64);
+    }
+    Ok(objects)
+}
+
+fn read_type_and_size(cursor: &mut Cursor<&[u8]>) -> std::io::Result<(u8, usize)> {
+    let mut size: usize;
+    let mut shift = 4;
+    let mut first_byte = [0u8; 1];
+
+    cursor.read_exact(&mut first_byte)?;
+    let byte = first_byte[0];
+    let object_type = (byte >> 4) & 0b111;
+    size = (byte & 0x0F) as usize;
+
+    // 0x80 = 10000000
+    if byte & 0x80 != 0 {
+        loop {
+            // Read the continuation byte again
+            let mut b = [0u8; 1];
+            cursor.read_exact(&mut b)?;
+
+            // 0x7F = 01111111
+            size |= ((b[0] & 0x7F) as usize) << shift;
+            shift += 7;
+            if b[0] & 0x80 == 0 {
+                break;
+            }
+        }
+    }
+    Ok((object_type, size))
 }
