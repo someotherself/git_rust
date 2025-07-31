@@ -8,9 +8,16 @@ mod test_common;
 
 use clap::{Arg, ArgAction, Command, command};
 use git_rust::RepoRust;
+use tracing_subscriber::EnvFilter;
 
 use std::env;
 fn main() -> std::io::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::from_default_env().add_directive("git_rust=info".parse().unwrap()),
+        )
+        .init();
+    tracing::info!("Starting git-rust CLI");
     let matches = command!()
         // git init
         .subcommand(Command::new("init").about("Create an empty git directory"))
@@ -149,5 +156,6 @@ fn main() -> std::io::Result<()> {
         Some(("clone", args)) => RepoRust::clone(args)?,
         Some((_, _)) | None => {}
     }
+    tracing::info!("Shutting down git-rust");
     Ok(())
 }

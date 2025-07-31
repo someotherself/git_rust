@@ -6,6 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use thread_local::ThreadLocal;
+use tracing::{debug, error, info, instrument};
 
 use crate::{
     index::Index,
@@ -139,17 +140,44 @@ impl RepoRust {
         Ok(())
     }
 
+    #[instrument]
     pub fn init() -> std::io::Result<()> {
         let root = Self::get_root();
-        let head = root.absolute_path.join(BASE_DIR).join("HEAD");
-        if head.try_exists()? {
+        let git_dir = root.absolute_path.join(BASE_DIR);
+        let head = git_dir.join("HEAD");
+        let objects = git_dir.join("objects");
+        let refs = git_dir.join("refs");
+
+        info!(?git_dir, "initializing git directory");
+        if head.try_exists().map_err(|e| {
+            error!(?head, %e, "failed to check HEAD existence");
+            e
+        })? {
+            error!(?head, "HEAD already exists – repo is initialized");
             return Err(Error::other("Git already initialized!"));
         }
-        fs::create_dir(root.absolute_path.join(BASE_DIR))?;
-        fs::create_dir(root.absolute_path.join(BASE_DIR).join("objects"))?;
-        fs::create_dir(root.absolute_path.join(BASE_DIR).join("refs"))?;
-        fs::write(head, "ref: refs/heads/master\n")?;
-        println!("Initialized git directory!");
+        debug!(?git_dir, "creating .git directory");
+        fs::create_dir(&git_dir).map_err(|e| {
+            error!(?git_dir, %e, "failed to create .git directory");
+            e
+        })?;
+        debug!(?objects, "creating objects directory");
+        fs::create_dir(&objects).map_err(|e| {
+            error!(?objects, %e, "failed to create objects directory");
+            e
+        })?;
+        debug!(?refs, "creating refs directory");
+        fs::create_dir(&refs).map_err(|e| {
+            error!(?refs, %e, "failed to create refs directory");
+            e
+        })?;
+        debug!(?head, "writing HEAD file");
+        fs::write(&head, "ref: refs/heads/master\n").map_err(|e| {
+            error!(?head, %e, "failed to write HEAD file");
+            e
+        })?;
+
+        info!("initialized git directory successfully");
         Ok(())
     }
 

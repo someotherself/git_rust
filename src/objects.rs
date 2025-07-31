@@ -10,6 +10,7 @@ use crate::{
     git_rust::RepoRust,
     objects::{blob::Blob, commit::Commit, tree::Tree},
 };
+use tracing::instrument;
 
 pub mod blob;
 pub mod commit;
@@ -73,6 +74,7 @@ impl Header {
     }
 }
 
+#[instrument]
 pub fn cat_file(hash: &str, pretty: bool) -> std::io::Result<Vec<u8>> {
     let root_path = RepoRust::get_object_folder(&RepoRust::get_root().absolute_path);
     let (folder_name, file_name) = hash.split_at(2);

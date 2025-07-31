@@ -4,6 +4,7 @@ use clap::ArgMatches;
 use flate2::{Compress, Compression, write::ZlibEncoder};
 use hex::ToHex;
 use sha1::{Digest, Sha1};
+use tracing::instrument;
 
 use crate::{
     git_rust::RepoRust,
@@ -38,6 +39,7 @@ impl Blob {
     }
 
     // cat-file command
+    #[instrument]
     pub fn decode_object(content: &[u8]) -> std::io::Result<Vec<u8>> {
         let null_pos = content.iter().position(|&b| b == b'\0').unwrap();
         let content_bytes = content[null_pos + 1..].to_vec();
@@ -46,6 +48,7 @@ impl Blob {
     }
 
     // hash-object command
+    #[instrument]
     pub fn encode_object(args: &ArgMatches) -> std::io::Result<Self> {
         let sub_arg = args.get_flag("write");
         let object = args
