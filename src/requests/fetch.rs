@@ -211,18 +211,44 @@ fn unpack_packfile(packfile: &[u8]) -> std::io::Result<Vec<GitObject>> {
 
     for _ in 0..object_count {
         let (object_type, size) = read_type_and_size(&mut cursor)?;
-        let mut zlib = ZlibDecoder::new(&mut cursor);
+
+        match object_type {
+            6 => {
+                // If ofs-delta
+                let mut offset = 0usize;
+                loop {
+                    let byte = cursor.read_u8()?;
+                    offset = (offset << 7) | ((byte & 0x7F) as usize);
+                    if byte & 0x80 == 0 {
+                        break;
+                    }
+                }
+            }
+            // If ref-delta
+            7 => {
+                let mut base_id = [0u8; 20];
+                cursor.read_exact(&mut base_id)?;
+            }
+            _ => {}
+        };
+
+        let start_offset = cursor.position();
+
+        let remaining = &packfile[start_offset as usize..];
+        let mut decoder = ZlibDecoder::new(remaining);
+
         let mut data = Vec::new();
-        zlib.read_to_end(&mut data).unwrap();
+        decoder.read_to_end(&mut data).unwrap();
+
+        let consumed = decoder.total_in();
+
+        cursor.set_position(start_offset + consumed);
 
         objects.push(GitObject {
             object_type,
             size,
             data,
         });
-
-        let used = pack.len() - cursor.get_ref().len();
-        cursor.set_position(used as u64);
     }
     Ok(objects)
 }
